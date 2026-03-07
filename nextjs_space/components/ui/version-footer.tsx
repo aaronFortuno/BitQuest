@@ -5,9 +5,48 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.3.0';
+const VERSION = 'v0.4.0';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.0',
+    date: '2026-03-07',
+    changes: {
+      ca: [
+        'Fase 0 completament jugable i llesta per producció',
+        'Mode fosc complet amb paleta zinc i accents amber',
+        'Header compacte: controls docent, saldo alumne, instruccions per rol',
+        'Dashboard docent: 2 columnes, indicador groc de sobrecost, dark mode',
+        'Interfície alumne: layout 2 columnes, editor click-to-edit, auto-save',
+        'Instruccions separades: panell lateral (docent) i dropdown (alumne)',
+        'Navegació de fases compacta amb accions directes',
+        'Selector d\'idioma només icona, barres d\'scroll ocultes',
+        'Icona de moneda Font Awesome (fa-cent-sign)',
+      ],
+      es: [
+        'Fase 0 completamente jugable y lista para producción',
+        'Modo oscuro completo con paleta zinc y acentos amber',
+        'Header compacto: controles docente, saldo alumno, instrucciones por rol',
+        'Dashboard docente: 2 columnas, indicador amarillo de sobregasto, dark mode',
+        'Interfaz alumno: layout 2 columnas, editor click-to-edit, auto-save',
+        'Instrucciones separadas: panel lateral (docente) y dropdown (alumno)',
+        'Navegación de fases compacta con acciones directas',
+        'Selector de idioma solo icono, barras de scroll ocultas',
+        'Icono de moneda Font Awesome (fa-cent-sign)',
+      ],
+      en: [
+        'Phase 0 fully playable and production-ready',
+        'Full dark mode with zinc palette and amber accents',
+        'Compact header: teacher controls, student balance, role-aware instructions',
+        'Teacher dashboard: 2-column layout, yellow overspend indicator, dark mode',
+        'Student interface: 2-column layout, click-to-edit editor, auto-save',
+        'Separate instructions: side panel (teacher) and dropdown (student)',
+        'Compact phase navigation with direct actions',
+        'Icon-only language selector, hidden scrollbars',
+        'Font Awesome coin icon (fa-cent-sign)',
+      ],
+    },
+  },
   {
     version: 'v0.3.0',
     date: '2026-03-07',
