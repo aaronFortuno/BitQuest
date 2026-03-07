@@ -8,11 +8,15 @@ export function Providers({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Apply theme before first paint to avoid flash
+    const stored = localStorage.getItem('bitquest_theme');
+    const prefersDark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', prefersDark);
     setMounted(true);
   }, []);
 
   if (!mounted) {
-    return <div className="min-h-screen bg-amber-50" />;
+    return <div className="min-h-screen" />;
   }
 
   return (

@@ -7,12 +7,8 @@ import {
   FileJson,
   Send,
   List,
-  BookOpen,
   HelpCircle,
   AlertTriangle,
-  Copy,
-  Check,
-  Edit3,
   Save,
 } from 'lucide-react';
 import { Room, Participant, Transaction, CoinFile } from '@/lib/types';
@@ -33,18 +29,18 @@ export default function StudentInterface({
   const { t } = useTranslation();
   const [coinFileText, setCoinFileText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [selectedReceiver, setSelectedReceiver] = useState('');
   const [amount, setAmount] = useState('');
   const [sending, setSending] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
-    if (participant?.coinFile) {
+    if (participant?.coinFile && !isEditing) {
       setCoinFileText(participant.coinFile);
     }
-  }, [participant?.coinFile]);
+  }, [participant?.coinFile, isEditing]);
 
   const otherStudents = (room?.participants ?? []).filter(
     (p) => p.id !== participant?.id && p.role === 'student' && p.isActive
@@ -52,15 +48,10 @@ export default function StudentInterface({
 
   const transactions = room?.transactions ?? [];
 
-  const handleCopyFile = async () => {
-    await navigator.clipboard.writeText(coinFileText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleSaveFile = async () => {
     await onUpdateCoinFile(coinFileText);
     setIsEditing(false);
+    setIsDirty(false);
   };
 
   const handleSendTransaction = async () => {
@@ -75,7 +66,6 @@ export default function StudentInterface({
       return;
     }
 
-    // Get current balance before transaction
     let currentBalance = 10;
     try {
       const coinFile = JSON.parse(participant?.coinFile ?? '{}');
@@ -92,161 +82,158 @@ export default function StudentInterface({
     if (tx) {
       const receiver = otherStudents.find((s) => s.id === selectedReceiver);
       const receiverName = receiver?.name ?? '';
-      
-      // Check if balance will be negative after transaction
+
       if (newBalance < 0) {
         setFeedback(t('transactionSentNegative', { amount: amountNum, name: receiverName }));
       } else {
         setFeedback(t('transactionSent', { amount: amountNum, name: receiverName }));
       }
-      
+
       setSelectedReceiver('');
       setAmount('');
-      
-      // Clear feedback after 5 seconds
       setTimeout(() => setFeedback(''), 5000);
     }
   };
 
-
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Zone 1: Coin File Editor */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="zone-card"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <FileJson className="w-5 h-5 text-amber-500" />
-            <h2 className="font-semibold text-gray-800">{t('myCoinFile')}</h2>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Left column: Send + File editor */}
+      <div className="space-y-4">
+        {/* Send row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="zone-card"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Send className="w-4 h-4 text-violet-500" />
+            <h2 className="font-semibold text-gray-800 dark:text-zinc-100 text-sm">{t('sendCoins')}</h2>
           </div>
-          <button
-            onClick={() => setShowHelp(!showHelp)}
-            className="p-1 hover:bg-gray-100 rounded-full"
-          >
-            <HelpCircle className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
 
-        {showHelp && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700"
-          >
-            {t('coinFileDescription')}
-          </motion.div>
-        )}
+          <div className="flex items-end gap-2">
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs text-gray-500 dark:text-zinc-500 mb-1">{t('whoToSend')}</label>
+              <select
+                value={selectedReceiver}
+                onChange={(e) => setSelectedReceiver(e.target.value)}
+                className="w-full px-3 py-2 border-2 border-gray-200 dark:border-zinc-600 rounded-lg text-sm bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:border-amber-400 transition-colors"
+              >
+                <option value="">--</option>
+                {otherStudents.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div className="relative">
-          <textarea
-            value={coinFileText}
-            onChange={(e) => setCoinFileText(e.target.value)}
-            disabled={!isEditing}
-            className="json-editor w-full h-40 resize-none"
-            spellCheck={false}
-          />
-        </div>
+            <div className="w-20">
+              <label className="block text-xs text-gray-500 dark:text-zinc-500 mb-1">{t('howManyCoins')}</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="1"
+                className="w-full px-3 py-2 border-2 border-gray-200 dark:border-zinc-600 rounded-lg text-sm text-center bg-white dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:border-amber-400 transition-colors"
+                placeholder="0"
+              />
+            </div>
 
-        <div className="flex gap-2 mt-4">
-          {isEditing ? (
-            <button onClick={handleSaveFile} className="btn-primary flex-1 flex items-center justify-center gap-2">
-              <Save className="w-4 h-4" />
-              {t('save')}
-            </button>
-          ) : (
             <button
-              onClick={() => setIsEditing(true)}
-              className="btn-outline flex-1 flex items-center justify-center gap-2"
+              onClick={handleSendTransaction}
+              disabled={sending || !selectedReceiver || !amount}
+              className="p-2.5 bg-violet-500 hover:bg-violet-600 disabled:bg-gray-300 dark:disabled:bg-zinc-600 text-white rounded-lg transition-colors flex-shrink-0"
+              title={t('send')}
             >
-              <Edit3 className="w-4 h-4" />
-              {t('editFile')}
+              <Send className="w-4 h-4" />
             </button>
-          )}
-          <button
-            onClick={handleCopyFile}
-            className="btn-outline flex items-center justify-center gap-2 px-4"
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
-        </div>
-
-        <p className="mt-3 text-xs text-gray-500 flex items-center gap-1">
-          <AlertTriangle className="w-3 h-3" />
-          {t('cheatingWarning')}
-        </p>
-      </motion.div>
-
-      {/* Zone 2: Transaction Sender */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="zone-card"
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <Send className="w-5 h-5 text-violet-500" />
-          <h2 className="font-semibold text-gray-800">{t('sendCoins')}</h2>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('whoToSend')}
-            </label>
-            <select
-              value={selectedReceiver}
-              onChange={(e) => setSelectedReceiver(e.target.value)}
-              className="input-field"
-            >
-              <option value="">-- Selecciona --</option>
-              {otherStudents.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.name}
-                </option>
-              ))}
-            </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('howManyCoins')}
-            </label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="1"
-              className="input-field"
-              placeholder="0"
+          {feedback && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 rounded-lg"
+            >
+              {feedback}
+            </motion.p>
+          )}
+        </motion.div>
+
+        {/* Coin file editor */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="zone-card"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <FileJson className="w-4 h-4 text-amber-500" />
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100 text-sm">{t('myCoinFile')}</h2>
+            </div>
+            <div className="flex items-center gap-1">
+              {isDirty && (
+                <button
+                  onClick={handleSaveFile}
+                  className="p-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                  title={t('save')}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setShowHelp(!showHelp)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full"
+              >
+                <HelpCircle className="w-4 h-4 text-gray-400 dark:text-zinc-500" />
+              </button>
+            </div>
+          </div>
+
+          {showHelp && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mb-3 p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-lg text-xs text-blue-700 dark:text-blue-400"
+            >
+              {t('coinFileDescription')}
+            </motion.div>
+          )}
+
+          <div
+            onClick={() => { if (!isEditing) { setIsEditing(true); } }}
+            className={`relative cursor-text rounded-lg transition-colors ${
+              isEditing
+                ? 'ring-2 ring-amber-400 dark:ring-amber-500'
+                : 'hover:ring-1 hover:ring-gray-300 dark:hover:ring-zinc-600'
+            }`}
+          >
+            <textarea
+              value={coinFileText}
+              onChange={(e) => {
+                setCoinFileText(e.target.value);
+                setIsDirty(true);
+                if (!isEditing) setIsEditing(true);
+              }}
+              onBlur={() => {
+                if (isDirty) handleSaveFile();
+                else setIsEditing(false);
+              }}
+              readOnly={!isEditing}
+              className="json-editor w-full h-28 resize-none text-xs"
+              spellCheck={false}
             />
           </div>
 
-          <button
-            onClick={handleSendTransaction}
-            disabled={sending || !selectedReceiver || !amount}
-            className="btn-secondary w-full flex items-center justify-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            {sending ? t('loading') : t('send')}
-          </button>
+          <p className="mt-2 text-xs text-gray-500 dark:text-zinc-500 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            {t('cheatingWarning')}
+          </p>
+        </motion.div>
+      </div>
 
-          {feedback && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-3 bg-amber-50 rounded-lg text-sm text-amber-700"
-            >
-              {feedback}
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
-
-      {/* Zone 3: Transaction Registry */}
+      {/* Right column: Transaction history */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -254,14 +241,14 @@ export default function StudentInterface({
         className="zone-card"
       >
         <div className="flex items-center gap-2 mb-4">
-          <List className="w-5 h-5 text-green-500" />
-          <h2 className="font-semibold text-gray-800">{t('transactionRegistry')}</h2>
+          <List className="w-4 h-4 text-green-500" />
+          <h2 className="font-semibold text-gray-800 dark:text-zinc-100 text-sm">{t('transactionRegistry')}</h2>
         </div>
 
-        <div className="space-y-2 max-h-80 overflow-y-auto">
+        <div className="space-y-2 max-h-96 overflow-y-auto">
           {transactions.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-4">
-              No hi ha transaccions encara
+            <p className="text-gray-500 dark:text-zinc-500 text-sm text-center py-4">
+              {t('noTransactionsYet') || 'No hi ha transaccions encara'}
             </p>
           ) : (
             transactions.map((tx) => (
@@ -274,38 +261,14 @@ export default function StudentInterface({
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-700">{tx.sender?.name}</span>
-                  <span className="text-gray-400">→</span>
-                  <span className="font-medium text-gray-700">{tx.receiver?.name}</span>
+                  <span className="font-medium text-gray-700 dark:text-zinc-300">{tx.sender?.name}</span>
+                  <span className="text-gray-400 dark:text-zinc-600">&rarr;</span>
+                  <span className="font-medium text-gray-700 dark:text-zinc-300">{tx.receiver?.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-600 font-semibold">{tx.amount} 🪙</span>
-                </div>
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">{tx.amount}</span>
               </motion.div>
             ))
           )}
-        </div>
-      </motion.div>
-
-      {/* Zone 4: Context/Instructions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="zone-card lg:col-span-3"
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <BookOpen className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold text-gray-800">Fase 0: {t('phase0')}</h2>
-        </div>
-
-        <div className="prose prose-sm max-w-none">
-          <p className="text-gray-600">{t('helpPhase0')}</p>
-          <div className="mt-4 p-4 bg-amber-50 rounded-lg">
-            <p className="text-amber-700 font-medium">
-              🤔 Pregunta clau: "{t('phase0')}" - Per què no podem simplement crear diners digitals com creem un document de Word?
-            </p>
-          </div>
         </div>
       </motion.div>
     </div>

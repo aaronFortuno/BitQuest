@@ -33,11 +33,9 @@ export default function LanguageSelector() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+        className="flex items-center gap-2 p-2 text-sm text-gray-600 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
       >
         <Globe className="w-4 h-4" />
-        <span className="hidden sm:inline">{currentLang.shortCode} - {currentLang.name}</span>
-        <span className="sm:hidden">{currentLang.shortCode}</span>
       </button>
 
       <AnimatePresence>
@@ -47,18 +45,18 @@ export default function LanguageSelector() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-40 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-gray-100 dark:border-zinc-700 overflow-hidden z-50"
           >
             {languages.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => handleLanguageChange(lang.code)}
-                className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between hover:bg-gray-50 transition-colors ${
-                  lang.code === i18n.language ? 'bg-amber-50 text-amber-700' : 'text-gray-700'
+                className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors ${
+                  lang.code === i18n.language ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'text-gray-700 dark:text-zinc-300'
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{lang.shortCode}</span>
+                  <span className="font-mono text-xs bg-gray-100 dark:bg-zinc-600 px-1.5 py-0.5 rounded">{lang.shortCode}</span>
                   <span>{lang.name}</span>
                 </span>
                 {lang.code === i18n.language && (

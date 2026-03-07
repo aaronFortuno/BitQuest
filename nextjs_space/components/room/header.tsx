@@ -1,99 +1,146 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'framer-motion';
-import { Coins, Users, Copy, Check, LogOut, Menu, GraduationCap } from 'lucide-react';
+import { Coins, Users, LogOut, Menu, Activity, BookOpen, RotateCcw, ArrowRight } from 'lucide-react';
 import { Room } from '@/lib/types';
 import LanguageSelector from '@/components/ui/language-selector';
+import ThemeToggle from '@/components/ui/theme-toggle';
 
 interface HeaderProps {
   room: Room;
-  participantName: string;
   isTeacher: boolean;
+  studentBalance?: number | null;
   onLeave: () => void;
   onToggleNavigation: () => void;
+  onToggleInstructions?: () => void;
+  onResetPhase?: () => void;
+  onAdvancePhase?: () => void;
 }
 
-export default function Header({ room, participantName, isTeacher, onLeave, onToggleNavigation }: HeaderProps) {
+export default function Header({
+  room,
+  isTeacher,
+  studentBalance,
+  onLeave,
+  onToggleNavigation,
+  onToggleInstructions,
+  onResetPhase,
+  onAdvancePhase,
+}: HeaderProps) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyCode = async () => {
-    await navigator.clipboard.writeText(room?.code ?? '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const activePeers = (room?.participants ?? []).filter((p) => p.role === 'student' && p.isActive).length;
   const currentPhaseKey = `phase${room?.currentPhase ?? 0}`;
+  const txCount = room?.transactions?.length ?? 0;
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
+    <header className="sticky top-0 z-40 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-gray-100 dark:border-zinc-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          {/* Left: Logo & Room Code */}
-          <div className="flex items-center gap-4">
+          {/* Left: Menu + Teacher controls + Logo + Code */}
+          <div className="flex items-center gap-3">
             <button
               onClick={onToggleNavigation}
-              className="p-2 hover:bg-amber-50 rounded-lg transition-colors"
+              className="p-2 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors"
             >
-              <Menu className="w-5 h-5 text-gray-600" />
+              <Menu className="w-5 h-5 text-gray-600 dark:text-zinc-400" />
             </button>
+
+            {isTeacher && onResetPhase && (
+              <button
+                onClick={() => {
+                  if (confirm(t('confirmResetPhase') || 'Reset phase?')) {
+                    onResetPhase();
+                  }
+                }}
+                className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors group"
+                title={t('resetPhase')}
+              >
+                <RotateCcw className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
+              </button>
+            )}
+
+            {isTeacher && onAdvancePhase && (
+              <button
+                onClick={onAdvancePhase}
+                disabled={(room?.currentPhase ?? 0) >= 9}
+                className="p-2 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg transition-colors group disabled:opacity-30"
+                title={t('advancePhase')}
+              >
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600" />
+              </button>
+            )}
+
+            {isTeacher && <div className="h-6 w-px bg-gray-200 dark:bg-zinc-700" />}
 
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
                 <Coins className="w-4 h-4 text-white" />
               </div>
-              <span className="font-bold text-gray-800 hidden sm:block">{t('appName')}</span>
+              <span className="font-bold text-gray-800 dark:text-zinc-100 hidden sm:block">{t('appName')}</span>
             </div>
 
-            <div className="h-6 w-px bg-gray-200" />
+            <div className="h-6 w-px bg-gray-200 dark:bg-zinc-700" />
 
-            <button
-              onClick={handleCopyCode}
-              className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
-            >
-              <span className="font-mono font-bold text-amber-700">{room?.code}</span>
-              {copied ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Copy className="w-4 h-4 text-amber-500" />
-              )}
-            </button>
-          </div>
-
-          {/* Center: Phase Info */}
-          <div className="hidden md:flex items-center gap-2">
-            <span className="text-sm text-gray-500">{t('currentPhase')}:</span>
-            <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-              {t(currentPhaseKey)}
+            <span className="font-mono font-bold text-amber-700 dark:text-amber-400 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
+              {room?.code}
             </span>
           </div>
 
-          {/* Right: Participants & User */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-gray-600">
+          {/* Center: Phase Title + Student instructions toggle (round) */}
+          <div className="hidden md:flex items-center gap-2">
+            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full text-sm font-medium">
+              {t(currentPhaseKey)}
+            </span>
+            {!isTeacher && onToggleInstructions && (
+              <button
+                onClick={onToggleInstructions}
+                className="w-7 h-7 flex items-center justify-center bg-blue-100 dark:bg-blue-500/20 rounded-full hover:bg-blue-200 dark:hover:bg-blue-500/30 transition-colors"
+                title={t('instructions')}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              </button>
+            )}
+          </div>
+
+          {/* Right: Stats & Controls */}
+          <div className="flex items-center gap-3">
+            {!isTeacher && studentBalance != null && (
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                studentBalance >= 0
+                  ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
+                  : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+              }`}>
+                {studentBalance} <i className="fa-solid fa-cent-sign" />
+              </span>
+            )}
+
+            <div className="flex items-center gap-2 text-gray-600 dark:text-zinc-400">
               <Users className="w-4 h-4" />
-              <span className="text-sm">{activePeers} {t('peers')}</span>
+              <span className="text-sm">{activePeers}</span>
             </div>
 
-            <div className="h-6 w-px bg-gray-200 hidden sm:block" />
-
-            <div className="flex items-center gap-2">
-              {isTeacher && (
-                <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
-                  <GraduationCap className="w-3 h-3 text-white" />
-                </div>
-              )}
-              <span className="text-sm font-medium text-gray-700 hidden sm:block">{participantName}</span>
+            <div className="flex items-center gap-2 text-gray-400 dark:text-zinc-500">
+              <Activity className="w-4 h-4" />
+              <span className="text-sm">{txCount} Tx</span>
             </div>
 
+            <ThemeToggle />
             <LanguageSelector />
+
+            {isTeacher && onToggleInstructions && (
+              <button
+                onClick={onToggleInstructions}
+                className="p-2 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors group"
+                title={t('instructions')}
+              >
+                <BookOpen className="w-5 h-5 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+              </button>
+            )}
 
             <button
               onClick={onLeave}
-              className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+              className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors group"
               title={t('leaveRoom')}
             >
               <LogOut className="w-5 h-5 text-gray-400 group-hover:text-red-500" />

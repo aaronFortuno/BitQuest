@@ -26,54 +26,54 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+            className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-amber-500" />
-                <h2 className="font-semibold text-gray-800">{t('help')}</h2>
+                <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('help')}</h2>
               </div>
               <button
                 onClick={onClose}
-                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-gray-500 dark:text-zinc-400" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
+              <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
                 <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Coins className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-800">Què és BitQuest?</p>
-                  <p className="text-sm text-gray-600">Un simulador educatiu per aprendre com funciona Bitcoin de forma pràctica i progressiva.</p>
+                  <p className="font-medium text-gray-800 dark:text-zinc-100">Què és BitQuest?</p>
+                  <p className="text-sm text-gray-600 dark:text-zinc-400">Un simulador educatiu per aprendre com funciona Bitcoin de forma pràctica i progressiva.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl">
+              <div className="flex items-center gap-3 p-3 bg-violet-50 dark:bg-violet-500/10 rounded-xl">
                 <div className="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center flex-shrink-0">
                   <GraduationCap className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-800">Com començar?</p>
-                  <p className="text-sm text-gray-600">El professor crea una sala i comparteix el codi amb els participants per unir-se.</p>
+                  <p className="font-medium text-gray-800 dark:text-zinc-100">Com començar?</p>
+                  <p className="text-sm text-gray-600 dark:text-zinc-400">El professor crea una sala i comparteix el codi amb els participants per unir-se.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
+              <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-500/10 rounded-xl">
                 <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Users className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-800">Fases progressives</p>
-                  <p className="text-sm text-gray-600">Començareu pel problema del doble pagament i anireu descobrint les solucions pas a pas.</p>
+                  <p className="font-medium text-gray-800 dark:text-zinc-100">Fases progressives</p>
+                  <p className="text-sm text-gray-600 dark:text-zinc-400">Començareu pel problema del doble pagament i anireu descobrint les solucions pas a pas.</p>
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 text-center pt-2">
+              <p className="text-xs text-gray-400 dark:text-zinc-500 text-center pt-2">
                 Dissenyat per a estudiants de cicle superior de primària fins a batxillerat.
               </p>
             </div>

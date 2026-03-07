@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { apiUrl } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,8 @@ import Header from '@/components/room/header';
 import PhaseNavigation from '@/components/room/phase-navigation';
 import StudentInterface from '@/components/room/student-interface';
 import TeacherDashboard from '@/components/room/teacher-dashboard';
+import InstructionsPanel from '@/components/room/instructions-panel';
+import StudentPhaseDropdown from '@/components/room/student-phase-dropdown';
 import Phase1UserInterface from '@/components/room/phase1-user-interface';
 import Phase2UserInterface from '@/components/room/phase2-user-interface';
 import Phase3UserInterface from '@/components/room/phase3-user-interface';
@@ -34,6 +36,9 @@ export default function RoomPage() {
   } | null>(null);
   const [mounted, setMounted] = useState(false);
   const [showNavigation, setShowNavigation] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showStudentInstructions, setShowStudentInstructions] = useState(true);
+  const prevPhaseRef = useRef<number>(-1);
 
   useEffect(() => {
     setMounted(true);
@@ -123,6 +128,19 @@ export default function RoomPage() {
     enabled: mounted && !!participantData && !!code,
   });
 
+  // Auto-open student instructions when phase changes
+  const roomPhase = room?.currentPhase ?? 0;
+  useEffect(() => {
+    if (prevPhaseRef.current === -1) {
+      prevPhaseRef.current = roomPhase;
+      return;
+    }
+    if (roomPhase !== prevPhaseRef.current) {
+      prevPhaseRef.current = roomPhase;
+      setShowStudentInstructions(true);
+    }
+  }, [roomPhase]);
+
   const handleLeaveRoom = async () => {
     if (participantData?.id) {
       await fetch(apiUrl(`/api/participants/${participantData.id}`), {
@@ -139,7 +157,7 @@ export default function RoomPage() {
 
   if (error || !room) {
     return (
-      <div className="min-h-screen bg-amber-50 flex items-center justify-center">
+      <div className="min-h-screen bg-amber-50 dark:bg-zinc-950 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || t('roomNotFound')}</p>
           <button onClick={() => router.push('/')} className="btn-primary">
@@ -155,6 +173,17 @@ export default function RoomPage() {
   );
   const isTeacher = participantData?.role === 'teacher';
   const currentPhase = room.currentPhase ?? 0;
+
+  // Parse student balance from coin file
+  const studentBalance = (() => {
+    if (isTeacher || !currentParticipant?.coinFile) return null;
+    try {
+      const coinFile = JSON.parse(currentParticipant.coinFile);
+      return coinFile?.saldo ?? 10;
+    } catch {
+      return 10;
+    }
+  })();
 
   // Render student interface based on current phase
   const renderStudentInterface = () => {
@@ -301,13 +330,22 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="min-h-screen bg-amber-50 flex flex-col">
+    <div className="min-h-screen bg-amber-50 dark:bg-zinc-950 flex flex-col">
       <Header
         room={room}
-        participantName={participantData?.name ?? ''}
         isTeacher={isTeacher}
+        studentBalance={studentBalance}
         onLeave={handleLeaveRoom}
         onToggleNavigation={() => setShowNavigation(!showNavigation)}
+        onToggleInstructions={isTeacher
+          ? () => setShowInstructions(!showInstructions)
+          : () => setShowStudentInstructions(!showStudentInstructions)
+        }
+        onResetPhase={isTeacher ? async () => { await resetPhase(); } : undefined}
+        onAdvancePhase={isTeacher ? () => {
+          const nextPhase = (room.currentPhase ?? 0) + 1;
+          if (nextPhase <= 9) updatePhase(nextPhase, nextPhase);
+        } : undefined}
       />
 
       <PhaseNavigation
@@ -318,6 +356,20 @@ export default function RoomPage() {
         onUnlockPhase={(phase) => updatePhase(undefined, phase)}
         onGoToPhase={(phase) => updatePhase(phase)}
       />
+
+      <InstructionsPanel
+        currentPhase={room.currentPhase ?? 0}
+        isOpen={showInstructions}
+        onClose={() => setShowInstructions(false)}
+      />
+
+      {!isTeacher && (
+        <StudentPhaseDropdown
+          currentPhase={currentPhase}
+          isOpen={showStudentInstructions}
+          onClose={() => setShowStudentInstructions(false)}
+        />
+      )}
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
         {isTeacher ? (
@@ -333,13 +385,6 @@ export default function RoomPage() {
             halvingInfo={halvingInfo}
             economicStats={economicStats}
             onHighlightTransaction={highlightTransaction}
-            onResetPhase={resetPhase}
-            onAdvancePhase={() => {
-              const nextPhase = (room.currentPhase ?? 0) + 1;
-              if (nextPhase <= 9) {
-                updatePhase(nextPhase, nextPhase);
-              }
-            }}
             onToggleBankDisconnection={toggleBankDisconnection}
             onApproveTransaction={approveTransaction}
             onRejectTransaction={rejectTransaction}

@@ -116,7 +116,7 @@ export default function BankInterface({
                     <span className={`font-mono font-semibold ${
                       balance < 0 ? 'text-red-600' : 'text-emerald-600'
                     }`}>
-                      {balance} 🪙
+                      {balance} <i className="fa-solid fa-cent-sign" />
                     </span>
                   </div>
                 );
@@ -269,7 +269,7 @@ export default function BankInterface({
                     <span className="text-sm text-gray-700">
                       {tx.sender?.name} → {tx.receiver?.name}
                     </span>
-                    <span className="text-sm font-semibold text-amber-600">{tx.amount} 🪙</span>
+                    <span className="text-sm font-semibold text-amber-600">{tx.amount} <i className="fa-solid fa-cent-sign" /></span>
                   </div>
                   {tx.status === 'rejected' && tx.rejectReason && (
                     <span className="text-xs text-red-600">{tx.rejectReason}</span>

@@ -129,7 +129,7 @@ export default function Phase1UserInterface({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-violet-500" />
-            <h2 className="font-semibold text-gray-800">{t('myAccount')}</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('myAccount')}</h2>
           </div>
           <button
             onClick={() => setShowHelp(!showHelp)}
@@ -143,7 +143,7 @@ export default function Phase1UserInterface({
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700"
+            className="mb-4 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg text-sm text-blue-700 dark:text-blue-400"
           >
             {t('yourBalanceControlled')}
           </motion.div>
@@ -157,14 +157,14 @@ export default function Phase1UserInterface({
             <div>
               <p className="text-sm text-violet-600">{t('userRole')}: {participant?.name}</p>
               <p className="text-2xl font-bold text-violet-800">
-                {currentBalance} <span className="text-lg">🪙</span>
+                {currentBalance} <i className="fa-solid fa-cent-sign" />
               </p>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 p-3 bg-amber-50 rounded-lg">
-          <div className="flex items-center gap-2 text-amber-700">
+        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
+          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
             <Lock className="w-4 h-4" />
             <p className="text-sm">{t('yourBalanceControlled')}</p>
           </div>
@@ -180,9 +180,9 @@ export default function Phase1UserInterface({
       >
         <div className="flex items-center gap-2 mb-4">
           <Send className="w-5 h-5 text-emerald-500" />
-          <h2 className="font-semibold text-gray-800">{t('requestTransaction')}</h2>
+          <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('requestTransaction')}</h2>
           {pendingCount > 0 && (
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">
+            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 dark:text-amber-400 rounded-full text-xs">
               {pendingCount} {t('pending').toLowerCase()}
             </span>
           )}
@@ -192,9 +192,9 @@ export default function Phase1UserInterface({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+            className="mb-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 rounded-lg"
           >
-            <div className="flex items-center gap-2 text-red-700">
+            <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
               <AlertTriangle className="w-4 h-4" />
               <p className="text-sm font-medium">{t('bankUnavailable')}</p>
             </div>
@@ -203,7 +203,7 @@ export default function Phase1UserInterface({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
               {t('whoToSend')}
             </label>
             <select
@@ -222,7 +222,7 @@ export default function Phase1UserInterface({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
               {t('howManyCoins')}
             </label>
             <input
@@ -255,12 +255,12 @@ export default function Phase1UserInterface({
               animate={{ opacity: 1 }}
               className={`p-3 rounded-lg text-sm ${
                 feedback.includes('aprovada') || feedback.includes('Esperant') || feedback.includes('enviada')
-                  ? 'bg-emerald-50 text-emerald-700'
+                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                   : feedback.includes('rebutjada') || feedback.includes('disponible')
-                  ? 'bg-red-50 text-red-700'
+                  ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'
                   : feedback.includes('oficina') || feedback.includes('presencialment')
-                  ? 'bg-orange-50 text-orange-700 border border-orange-200'
-                  : 'bg-amber-50 text-amber-700'
+                  ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-200'
+                  : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
               }`}
             >
               {feedback}
@@ -278,7 +278,7 @@ export default function Phase1UserInterface({
       >
         <div className="flex items-center gap-2 mb-4">
           <List className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold text-gray-800">{t('myTransactions')}</h2>
+          <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('myTransactions')}</h2>
         </div>
 
         <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -300,10 +300,10 @@ export default function Phase1UserInterface({
                     animate={{ opacity: 1, x: 0 }}
                     className={`p-3 rounded-lg ${
                       tx.status === 'pending'
-                        ? 'bg-amber-50 border-l-4 border-amber-400'
+                        ? 'bg-amber-50 dark:bg-amber-500/10 border-l-4 border-amber-400'
                         : tx.status === 'approved'
-                        ? 'bg-emerald-50 border-l-4 border-emerald-400'
-                        : 'bg-red-50 border-l-4 border-red-400'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-l-4 border-emerald-400'
+                        : 'bg-red-50 dark:bg-red-500/10 border-l-4 border-red-400'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -311,12 +311,12 @@ export default function Phase1UserInterface({
                         {tx.status === 'pending' && <Clock className="w-4 h-4 text-amber-500" />}
                         {tx.status === 'approved' && <CheckCircle className="w-4 h-4 text-emerald-500" />}
                         {tx.status === 'rejected' && <XCircle className="w-4 h-4 text-red-500" />}
-                        <span className="text-sm text-gray-700">
+                        <span className="text-sm text-gray-700 dark:text-zinc-300">
                           {isSender ? `Enviat a ${otherParty}` : `Rebut de ${otherParty}`}
                         </span>
                       </div>
                       <span className="text-sm font-semibold text-amber-600">
-                        {isSender ? '-' : '+'}{tx.amount} 🪙
+                        {isSender ? '-' : '+'}{tx.amount} <i className="fa-solid fa-cent-sign" />
                       </span>
                     </div>
                     {tx.status === 'rejected' && tx.rejectReason && (
@@ -341,13 +341,13 @@ export default function Phase1UserInterface({
       >
         <div className="flex items-center gap-2 mb-4">
           <BookOpen className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold text-gray-800">Fase 1: {t('phase1')}</h2>
+          <h2 className="font-semibold text-gray-800 dark:text-zinc-100">Fase 1: {t('phase1')}</h2>
         </div>
 
         <div className="prose prose-sm max-w-none">
           <p className="text-gray-600">{t('helpPhase1')}</p>
-          <div className="mt-4 p-4 bg-emerald-50 rounded-lg">
-            <p className="text-emerald-700 font-medium">
+          <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">
+            <p className="text-emerald-700 dark:text-emerald-400 font-medium">
               🤔 {t('phase1Question')}
             </p>
           </div>

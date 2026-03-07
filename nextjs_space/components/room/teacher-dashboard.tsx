@@ -6,9 +6,8 @@ import { motion } from 'framer-motion';
 import {
   GraduationCap,
   Users,
-  ArrowRight,
-  RotateCcw,
   AlertTriangle,
+  HelpCircle,
   Eye,
   Star,
   Activity,
@@ -38,8 +37,6 @@ interface TeacherDashboardProps {
   halvingInfo?: HalvingInfo | null;
   economicStats?: EconomicStats | null;
   onHighlightTransaction: (transactionId: string, isHighlighted: boolean) => Promise<void>;
-  onResetPhase: () => Promise<void>;
-  onAdvancePhase: () => void;
   onToggleBankDisconnection?: (isDisconnected: boolean) => Promise<void>;
   onApproveTransaction?: (transactionId: string) => Promise<void>;
   onRejectTransaction?: (transactionId: string, reason: string) => Promise<void>;
@@ -80,8 +77,6 @@ export default function TeacherDashboard({
   halvingInfo,
   economicStats,
   onHighlightTransaction,
-  onResetPhase,
-  onAdvancePhase,
   onToggleBankDisconnection,
   onApproveTransaction,
   onRejectTransaction,
@@ -107,7 +102,6 @@ export default function TeacherDashboard({
   onAccelerateHalvings,
 }: TeacherDashboardProps) {
   const { t } = useTranslation();
-  const [resetting, setResetting] = useState(false);
   const [processingTx, setProcessingTx] = useState<string | null>(null);
   const [fakeMessageContent, setFakeMessageContent] = useState('');
   const [fakeClaimedBy, setFakeClaimedBy] = useState('');
@@ -170,7 +164,10 @@ export default function TeacherDashboard({
     
     // Discrepancy: if the claimed balance doesn't match what transactions say
     const discrepancy = currentBalance !== calculatedBalance;
-    
+
+    // Check if any sent transaction was an overspend (sent more than available at that point)
+    const hasOverspent = sent.some(tx => isTransactionSuspicious(tx));
+
     return {
       transactionCount: sent.length,
       totalSent,
@@ -178,24 +175,8 @@ export default function TeacherDashboard({
       claimedBalance: currentBalance,
       calculatedBalance,
       discrepancy,
+      hasOverspent,
     };
-  };
-
-  const totalTransactions = transactions.length;
-  const suspiciousTransactions = transactions.filter(isTransactionSuspicious);
-  const studentsWithDiscrepancy = students.filter((student) => {
-    const stats = getStudentStats(student);
-    return stats.discrepancy;
-  }).length;
-  
-  // Total suspicious count: students who modified their balance OR made suspicious transactions
-  const totalSuspiciousCount = studentsWithDiscrepancy + suspiciousTransactions.length;
-
-  const handleReset = async () => {
-    if (!confirm('Estàs segur que vols reiniciar la fase? Totes les transaccions seran eliminades.')) return;
-    setResetting(true);
-    await onResetPhase();
-    setResetting(false);
   };
 
   // Phase 1 specific data
@@ -278,89 +259,6 @@ export default function TeacherDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card bg-gradient-to-br from-amber-50 to-orange-50"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">{t('activeStudents')}</p>
-              <p className="text-3xl font-bold text-amber-600">{students.length}</p>
-            </div>
-            <Users className="w-10 h-10 text-amber-400" />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="card bg-gradient-to-br from-violet-50 to-purple-50"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">{t('totalTransactions')}</p>
-              <p className="text-3xl font-bold text-violet-600">{totalTransactions}</p>
-            </div>
-            <Activity className="w-10 h-10 text-violet-400" />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="card bg-gradient-to-br from-red-50 to-pink-50"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Activitat sospitosa</p>
-              <p className="text-3xl font-bold text-red-600">{totalSuspiciousCount}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {suspiciousTransactions.length} TX + {studentsWithDiscrepancy} saldos
-              </p>
-            </div>
-            <AlertTriangle className="w-10 h-10 text-red-400" />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="card bg-gradient-to-br from-green-50 to-emerald-50"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">{t('currentPhase')}</p>
-              <p className="text-3xl font-bold text-green-600">{currentPhase}</p>
-            </div>
-            <TrendingUp className="w-10 h-10 text-green-400" />
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={handleReset}
-          disabled={resetting}
-          className="btn-outline flex items-center gap-2"
-        >
-          <RotateCcw className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
-          {t('resetPhase')}
-        </button>
-        <button
-          onClick={onAdvancePhase}
-          className="btn-primary flex items-center gap-2"
-        >
-          {t('advancePhase')}
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
 
       {/* Phase 1 Bank Control Panel */}
       {currentPhase === 1 && (
@@ -372,7 +270,7 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Landmark className="w-5 h-5 text-emerald-600" />
-              <h2 className="font-semibold text-gray-800">{t('bankPanel')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('bankPanel')}</h2>
               <span className="px-2 py-1 bg-emerald-200 text-emerald-800 rounded-full text-xs font-medium">
                 {t('youAreTheBank')}
               </span>
@@ -387,19 +285,19 @@ export default function TeacherDashboard({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('pendingRequests')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('pendingRequests')}</p>
               <p className="font-semibold text-amber-600 text-xl">{pendingTransactions.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('approvedTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('approvedTransactions')}</p>
               <p className="font-semibold text-emerald-600 text-xl">{approvedTransactions.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('rejectedTransactions')}</p>
-              <p className="font-semibold text-gray-600 text-xl">{rejectedTransactions.length}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('rejectedTransactions')}</p>
+              <p className="font-semibold text-gray-600 dark:text-zinc-400 text-xl">{rejectedTransactions.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('actsOfCensorship')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('actsOfCensorship')}</p>
               <p className="font-semibold text-red-600 text-xl">{censorshipActs}</p>
             </div>
           </div>
@@ -425,7 +323,7 @@ export default function TeacherDashboard({
           {/* Pending Transactions Queue */}
           {pendingTransactions.length > 0 && (
             <div className="mt-4">
-              <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-500" />
                 {t('pendingRequests')} ({pendingTransactions.length})
               </h3>
@@ -444,10 +342,10 @@ export default function TeacherDashboard({
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-700">{tx.sender?.name}</span>
+                          <span className="font-medium text-gray-700 dark:text-zinc-300">{tx.sender?.name}</span>
                           <span className="text-gray-400">→</span>
-                          <span className="font-medium text-gray-700">{tx.receiver?.name}</span>
-                          <span className="text-amber-600 font-bold">{tx.amount} 🪙</span>
+                          <span className="font-medium text-gray-700 dark:text-zinc-300">{tx.receiver?.name}</span>
+                          <span className="text-amber-600 font-bold">{tx.amount} <i className="fa-solid fa-cent-sign" /></span>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full text-xs ${
                           hasSufficientBalance 
@@ -484,7 +382,7 @@ export default function TeacherDashboard({
           )}
 
           {pendingTransactions.length === 0 && (
-            <p className="text-center text-gray-500 py-4 bg-white rounded-lg">
+            <p className="text-center text-gray-500 dark:text-zinc-500 py-4 bg-white rounded-lg">
               {t('noPendingRequests')}
             </p>
           )}
@@ -501,21 +399,21 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-purple-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase2')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase2')}</h2>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('proposedTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('proposedTransactions')}</p>
               <p className="font-semibold text-purple-600 text-xl">{proposedTransactions.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('acceptedTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('acceptedTransactions')}</p>
               <p className="font-semibold text-emerald-600 text-xl">{approvedTransactions.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('rejectedTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('rejectedTransactions')}</p>
               <p className="font-semibold text-red-600 text-xl">{rejectedTransactions.length}</p>
             </div>
           </div>
@@ -523,7 +421,7 @@ export default function TeacherDashboard({
           {/* Current Voting Proposal */}
           {votingTransaction && (
             <div className="mt-4 p-4 bg-white rounded-lg border-2 border-purple-300">
-              <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-purple-500" />
                 {t('currentProposal')}
               </h3>
@@ -533,7 +431,7 @@ export default function TeacherDashboard({
                   {' → '}
                   <span className="font-medium">{votingTransaction.receiver?.name}</span>
                   {': '}
-                  <span className="text-amber-600 font-bold">{votingTransaction.amount} 🪙</span>
+                  <span className="text-amber-600 font-bold">{votingTransaction.amount} <i className="fa-solid fa-cent-sign" /></span>
                 </p>
                 {votingTransaction.proposedById !== votingTransaction.senderId && (
                   <p className="text-xs text-orange-500 flex items-center gap-1">
@@ -578,7 +476,7 @@ export default function TeacherDashboard({
           )}
 
           {!votingTransaction && (
-            <p className="text-center text-gray-500 py-4 bg-white rounded-lg">
+            <p className="text-center text-gray-500 dark:text-zinc-500 py-4 bg-white rounded-lg">
               {t('noProposalsYet')}
             </p>
           )}
@@ -586,7 +484,7 @@ export default function TeacherDashboard({
           {/* Voting Participation Stats */}
           {proposedTransactions.length > 0 && (
             <div className="mt-4">
-              <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+              <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-purple-500" />
                 {t('votingParticipation')}
               </h3>
@@ -598,8 +496,8 @@ export default function TeacherDashboard({
                     : 0;
                   return (
                     <div key={student.id} className="p-2 bg-white rounded-lg">
-                      <p className="text-sm font-medium text-gray-700 truncate">{student.name}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 truncate">{student.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-zinc-500">
                         {participation.voted}/{participation.total} ({percentage}%)
                       </p>
                     </div>
@@ -621,38 +519,38 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <UserCog className="w-5 h-5 text-indigo-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase3')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase3')}</h2>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('studentsWithKeys')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('studentsWithKeys')}</p>
               <p className="font-semibold text-indigo-600 text-xl">{studentsWithKeys}/{students.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('messagesSent')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('messagesSent')}</p>
               <p className="font-semibold text-emerald-600 text-xl">{totalMessages}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('signaturesVerified')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('signaturesVerified')}</p>
               <p className="font-semibold text-blue-600 text-xl">{verifiedMessages}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('invalidSignatures')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('invalidSignatures')}</p>
               <p className="font-semibold text-red-600 text-xl">{invalidMessages}</p>
             </div>
           </div>
 
           {/* Send Fake Message Demo */}
           <div className="p-4 bg-white rounded-lg border border-orange-200">
-            <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-500" />
               {t('sendFakeMessageDemo')}
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="text-sm text-gray-600 block mb-1">{t('claimedIdentity')}</label>
+                <label className="text-sm text-gray-600 dark:text-zinc-400 block mb-1">{t('claimedIdentity')}</label>
                 <select
                   value={fakeClaimedBy}
                   onChange={(e) => setFakeClaimedBy(e.target.value)}
@@ -665,7 +563,7 @@ export default function TeacherDashboard({
                 </select>
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">{t('fakeMessageContent')}</label>
+                <label className="text-sm text-gray-600 dark:text-zinc-400 block mb-1">{t('fakeMessageContent')}</label>
                 <input
                   type="text"
                   value={fakeMessageContent}
@@ -686,7 +584,7 @@ export default function TeacherDashboard({
 
           {/* Student Key Status */}
           <div className="mt-4">
-            <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
               <Activity className="w-4 h-4 text-indigo-500" />
               {t('studentActivity')}
             </h3>
@@ -695,8 +593,8 @@ export default function TeacherDashboard({
                 const msgCount = messages.filter(m => m.senderId === student.id).length;
                 return (
                   <div key={student.id} className="p-2 bg-white rounded-lg">
-                    <p className="text-sm font-medium text-gray-700 truncate">{student.name}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 truncate">{student.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-500 flex items-center gap-2">
                       {student.publicKey ? (
                         <span className="text-green-600">✅ {t('keysGenerated')}</span>
                       ) : (
@@ -722,32 +620,32 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-amber-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase4')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase4')}</h2>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('totalUtxos')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('totalUtxos')}</p>
               <p className="font-semibold text-amber-600 text-xl">{utxos.filter(u => !u.isSpent).length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('spentUtxos')}</p>
-              <p className="font-semibold text-gray-600 text-xl">{utxos.filter(u => u.isSpent).length}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('spentUtxos')}</p>
+              <p className="font-semibold text-gray-600 dark:text-zinc-400 text-xl">{utxos.filter(u => u.isSpent).length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('utxoTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('utxoTransactions')}</p>
               <p className="font-semibold text-emerald-600 text-xl">{utxoTransactions.length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('invalidTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('invalidTransactions')}</p>
               <p className="font-semibold text-red-600 text-xl">{utxoTransactions.filter(tx => !tx.isValid).length}</p>
             </div>
           </div>
 
           {/* Student UTXO Status */}
           <div className="mt-4">
-            <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
               <Activity className="w-4 h-4 text-amber-500" />
               {t('studentActivity')}
             </h3>
@@ -758,7 +656,7 @@ export default function TeacherDashboard({
                 const txCount = utxoTransactions.filter(tx => tx.senderId === student.id).length;
                 return (
                   <div key={student.id} className="p-2 bg-white rounded-lg">
-                    <p className="text-sm font-medium text-gray-700 truncate">{student.name}</p>
+                    <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 truncate">{student.name}</p>
                     <p className="text-xs text-amber-600 font-semibold">{totalBalance} BTC</p>
                     <p className="text-xs text-gray-400">{studentUtxos.length} UTXOs • {txCount} TX</p>
                   </div>
@@ -779,25 +677,25 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-purple-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase5InstructionTitle')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase5InstructionTitle')}</h2>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase5.activeNodes')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase5.activeNodes')}</p>
               <p className="font-semibold text-purple-600 text-xl">{students.filter(s => !s.isNodeDisconnected).length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase5.connections')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase5.connections')}</p>
               <p className="font-semibold text-blue-600 text-xl">{nodeConnections.filter(c => c.isActive).length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('mempoolTransactions')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('mempoolTransactions')}</p>
               <p className="font-semibold text-indigo-600 text-xl">{mempoolTransactions.filter(tx => tx.status === 'in_mempool').length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('disconnectedNodes')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('disconnectedNodes')}</p>
               <p className="font-semibold text-red-600 text-xl">{students.filter(s => s.isNodeDisconnected).length}</p>
             </div>
           </div>
@@ -820,7 +718,7 @@ export default function TeacherDashboard({
 
           {/* Node Status with disconnect controls */}
           <div className="mt-4">
-            <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
               <Activity className="w-4 h-4 text-purple-500" />
               {t('studentActivity')} - {t('disconnectNode')}
             </h3>
@@ -841,7 +739,7 @@ export default function TeacherDashboard({
                     onClick={() => onToggleNodeDisconnection?.(student.id, !isDisconnected)}
                   >
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-700 truncate">{student.name}</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 truncate">{student.name}</p>
                       {isDisconnected ? (
                         <Unplug className="w-4 h-4 text-red-500" />
                       ) : (
@@ -876,30 +774,30 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-orange-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase6InstructionTitle')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase6InstructionTitle')}</h2>
             </div>
           </div>
 
           {/* Mining Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase6.currentBlock')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase6.currentBlock')}</p>
               <p className="font-semibold text-orange-600 text-xl">
                 #{blocks.find(b => b.status === 'pending')?.blockNumber || (blocks.filter(b => b.status === 'mined').length > 0 ? blocks.filter(b => b.status === 'mined').sort((a, b) => b.blockNumber - a.blockNumber)[0].blockNumber + 1 : 1)}
               </p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase6.minedBlocks')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase6.minedBlocks')}</p>
               <p className="font-semibold text-green-600 text-xl">{blocks.filter(b => b.status === 'mined').length}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase6.totalHashAttempts')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase6.totalHashAttempts')}</p>
               <p className="font-semibold text-blue-600 text-xl">
                 {students.reduce((sum, s) => sum + (s.hashAttempts || 0), 0)}
               </p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase6.activeMiners')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase6.activeMiners')}</p>
               <p className="font-semibold text-purple-600 text-xl">
                 {students.filter(s => (s.hashAttempts || 0) > 0).length}/{students.length}
               </p>
@@ -924,7 +822,7 @@ export default function TeacherDashboard({
 
           {/* Miner Rankings */}
           <div className="mt-4">
-            <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
               <Star className="w-4 h-4 text-yellow-500" />
               {t('phase6.minerRanking')}
             </h3>
@@ -945,7 +843,7 @@ export default function TeacherDashboard({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-700 truncate">{student.name}</p>
+                        <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 truncate">{student.name}</p>
                         {index === 0 && blocksCount > 0 && (
                           <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                         )}
@@ -970,14 +868,14 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-purple-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase7InstructionTitle')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase7InstructionTitle')}</h2>
             </div>
           </div>
 
           {/* Difficulty Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase7.currentDifficulty')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase7.currentDifficulty')}</p>
               <div className="flex items-center gap-1">
                 {Array.from({ length: difficultyInfo.currentDifficulty }, (_, i) => (
                   <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -986,11 +884,11 @@ export default function TeacherDashboard({
               </div>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase7.targetBlockTime')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase7.targetBlockTime')}</p>
               <p className="font-semibold text-blue-600 text-xl">{difficultyInfo.targetBlockTime}s</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase7.avgTimePerBlock')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase7.avgTimePerBlock')}</p>
               <p className={`font-semibold text-xl ${
                 difficultyInfo.avgTimePerBlock > 0
                   ? difficultyInfo.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
@@ -998,13 +896,13 @@ export default function TeacherDashboard({
                     : difficultyInfo.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
                       ? 'text-blue-600'
                       : 'text-green-600'
-                  : 'text-gray-600'
+                  : 'text-gray-600 dark:text-zinc-400'
               }`}>
                 {difficultyInfo.avgTimePerBlock > 0 ? `${difficultyInfo.avgTimePerBlock}s` : '--'}
               </p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase7.blocksInPeriod')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase7.blocksInPeriod')}</p>
               <p className="font-semibold text-indigo-600 text-xl">
                 {difficultyInfo.blocksInCurrentPeriod}/{difficultyInfo.adjustmentInterval}
               </p>
@@ -1014,7 +912,7 @@ export default function TeacherDashboard({
           {/* Period History */}
           {difficultyInfo.periodHistory.length > 0 && (
             <div className="mb-4">
-              <h3 className="font-medium text-gray-700 mb-2">{t('phase7.periodHistory')}</h3>
+              <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-2">{t('phase7.periodHistory')}</h3>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {difficultyInfo.periodHistory.slice().reverse().map((period, idx) => (
                   <div key={period.periodNumber} className={`p-2 rounded text-sm ${
@@ -1046,11 +944,11 @@ export default function TeacherDashboard({
 
           {/* Demo Controls */}
           <div className="p-4 bg-white rounded-lg border border-purple-200">
-            <h3 className="font-medium text-gray-700 mb-3">{t('phase7.demoControls')}</h3>
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3">{t('phase7.demoControls')}</h3>
             <div className="space-y-4">
               {/* Force Difficulty */}
               <div>
-                <p className="text-sm text-gray-600 mb-2">{t('phase7.forceDifficulty')}</p>
+                <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">{t('phase7.forceDifficulty')}</p>
                 <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((d) => (
                     <button
@@ -1075,7 +973,7 @@ export default function TeacherDashboard({
 
               {/* Change Target Time */}
               <div>
-                <p className="text-sm text-gray-600 mb-2">{t('phase7.changeTargetTime')}</p>
+                <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">{t('phase7.changeTargetTime')}</p>
                 <div className="flex gap-2 items-center">
                   <input
                     type="number"
@@ -1111,26 +1009,26 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-yellow-600" />
-              <h2 className="font-semibold text-gray-800">{t('phase8InstructionTitle')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase8InstructionTitle')}</h2>
             </div>
           </div>
 
           {/* Halving Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase8.currentReward')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.currentReward')}</p>
               <p className="font-semibold text-yellow-600 text-xl">{halvingInfo.currentBlockReward} BTC</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase8.blocksToHalving')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.blocksToHalving')}</p>
               <p className="font-semibold text-orange-600 text-xl">{halvingInfo.blocksUntilNextHalving}</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase8.nextReward')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.nextReward')}</p>
               <p className="font-semibold text-red-600 text-xl">{halvingInfo.nextReward.toFixed(2)} BTC</p>
             </div>
             <div className="p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-500">{t('phase8.totalEmitted')}</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.totalEmitted')}</p>
               <p className="font-semibold text-green-600 text-xl">{halvingInfo.totalBtcEmitted.toFixed(1)} / {halvingInfo.maxBtc}</p>
             </div>
           </div>
@@ -1139,15 +1037,15 @@ export default function TeacherDashboard({
           {economicStats && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase8.avgFee')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.avgFee')}</p>
                 <p className="font-semibold text-blue-600 text-xl">{economicStats.averageFee} BTC</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase8.totalFeesPaid')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.totalFeesPaid')}</p>
                 <p className="font-semibold text-purple-600 text-xl">{economicStats.totalFeesPaid} BTC</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase8.totalBlockRewards')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase8.totalBlockRewards')}</p>
                 <p className="font-semibold text-indigo-600 text-xl">{economicStats.totalBlockRewardsPaid} BTC</p>
               </div>
             </div>
@@ -1156,7 +1054,7 @@ export default function TeacherDashboard({
           {/* Miner Earnings Ranking */}
           {economicStats && economicStats.minerEarnings.length > 0 && (
             <div className="mb-4">
-              <h3 className="font-medium text-gray-700 mb-2">{t('phase8.minerEarnings')}</h3>
+              <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-2">{t('phase8.minerEarnings')}</h3>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {economicStats.minerEarnings.map((miner, idx) => (
                   <div key={miner.minerId} className={`p-2 rounded text-sm ${idx === 0 ? 'bg-yellow-100' : 'bg-gray-50'}`}>
@@ -1174,11 +1072,11 @@ export default function TeacherDashboard({
 
           {/* Demo Controls */}
           <div className="p-4 bg-white rounded-lg border border-yellow-200">
-            <h3 className="font-medium text-gray-700 mb-3">{t('phase8.demoControls')}</h3>
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3">{t('phase8.demoControls')}</h3>
             <div className="space-y-4">
               {/* Force Halving */}
               <div>
-                <p className="text-sm text-gray-600 mb-2">{t('phase8.forceHalving')}</p>
+                <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">{t('phase8.forceHalving')}</p>
                 <button
                   onClick={async () => {
                     setForcingHalving(true);
@@ -1194,7 +1092,7 @@ export default function TeacherDashboard({
 
               {/* Change Block Reward */}
               <div>
-                <p className="text-sm text-gray-600 mb-2">{t('phase8.changeBlockReward')}</p>
+                <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">{t('phase8.changeBlockReward')}</p>
                 <div className="flex gap-2 items-center">
                   <input
                     type="number"
@@ -1219,7 +1117,7 @@ export default function TeacherDashboard({
 
               {/* Fill Mempool with varying fees */}
               <div>
-                <p className="text-sm text-gray-600 mb-2">{t('phase8.fillMempoolWithFees')}</p>
+                <p className="text-sm text-gray-600 dark:text-zinc-400 mb-2">{t('phase8.fillMempoolWithFees')}</p>
                 <button
                   onClick={() => onFillMempool?.(15)}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -1242,7 +1140,7 @@ export default function TeacherDashboard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🎓</span>
-              <h2 className="font-semibold text-gray-800">{t('phase9InstructionTitle')}</h2>
+              <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('phase9InstructionTitle')}</h2>
             </div>
             {room.simulationStarted && (
               <span className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">
@@ -1255,23 +1153,23 @@ export default function TeacherDashboard({
           {simulationStats && (
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase9.totalBlocks')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase9.totalBlocks')}</p>
                 <p className="font-semibold text-blue-600 text-xl">{simulationStats.totalBlocks}</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase9.totalTxs')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase9.totalTxs')}</p>
                 <p className="font-semibold text-green-600 text-xl">{simulationStats.totalTransactions}</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase9.btcCirculation')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase9.btcCirculation')}</p>
                 <p className="font-semibold text-yellow-600 text-xl">{simulationStats.btcInCirculation.toFixed(1)} BTC</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase9.hashrate')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase9.hashrate')}</p>
                 <p className="font-semibold text-orange-600 text-xl">{simulationStats.totalHashrate}</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">{t('phase9.energySpent')}</p>
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{t('phase9.energySpent')}</p>
                 <p className="font-semibold text-red-600 text-xl">{simulationStats.totalEnergySpent} kWh</p>
               </div>
             </div>
@@ -1280,7 +1178,7 @@ export default function TeacherDashboard({
           {/* Wealth Distribution */}
           {simulationStats && simulationStats.wealthDistribution.length > 0 && (
             <div className="mb-4">
-              <h3 className="font-medium text-gray-700 mb-2">{t('phase9.wealthDistribution')}</h3>
+              <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-2">{t('phase9.wealthDistribution')}</h3>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {simulationStats.wealthDistribution.map((entry, idx) => (
                   <div key={entry.participantId} className={`p-2 rounded text-sm flex items-center justify-between ${idx === 0 ? 'bg-yellow-100' : 'bg-gray-50'}`}>
@@ -1294,7 +1192,7 @@ export default function TeacherDashboard({
 
           {/* Challenge Controls */}
           <div className="p-4 bg-white rounded-lg border border-purple-200 mb-4">
-            <h3 className="font-medium text-gray-700 mb-3">🎯 {t('phase9.challenges')}</h3>
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3">🎯 {t('phase9.challenges')}</h3>
             
             {room.activeChallenge ? (
               <div className="space-y-3">
@@ -1383,7 +1281,7 @@ export default function TeacherDashboard({
 
           {/* Demo Controls */}
           <div className="p-4 bg-white rounded-lg border border-purple-200">
-            <h3 className="font-medium text-gray-700 mb-3">🎮 {t('phase9.demoControls')}</h3>
+            <h3 className="font-medium text-gray-700 dark:text-zinc-300 mb-3">🎮 {t('phase9.demoControls')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {!room.simulationStarted ? (
                 <button
@@ -1435,30 +1333,30 @@ export default function TeacherDashboard({
         >
           <div className="flex items-center gap-2 mb-4">
             <GraduationCap className="w-5 h-5 text-amber-500" />
-            <h2 className="font-semibold text-gray-800">{t('studentActivity')}</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('studentActivity')}</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-2 font-medium text-gray-600">Nom</th>
-                  <th className="text-center py-2 px-2 font-medium text-gray-600">TX</th>
-                  <th className="text-center py-2 px-2 font-medium text-gray-600">Enviat</th>
-                  <th className="text-center py-2 px-2 font-medium text-gray-600">Rebut</th>
-                  <th className="text-center py-2 px-2 font-medium text-gray-600">Saldo</th>
-                  <th className="text-center py-2 px-2 font-medium text-gray-600">Sospitós?</th>
+                <tr className="border-b border-gray-200 dark:border-zinc-700">
+                  <th className="text-left py-2 px-2 font-medium text-gray-600 dark:text-zinc-400 dark:text-zinc-400">Nom</th>
+                  <th className="text-center py-2 px-2 font-medium text-gray-600 dark:text-zinc-400 dark:text-zinc-400">TX</th>
+                  <th className="text-center py-2 px-2 font-medium text-gray-600 dark:text-zinc-400 dark:text-zinc-400">Enviat</th>
+                  <th className="text-center py-2 px-2 font-medium text-gray-600 dark:text-zinc-400 dark:text-zinc-400">Rebut</th>
+                  <th className="text-center py-2 px-2 font-medium text-gray-600 dark:text-zinc-400 dark:text-zinc-400">Saldo</th>
+                  <th className="text-center py-2 px-2 font-medium text-gray-600 dark:text-zinc-400 dark:text-zinc-400">Sospitós?</th>
                 </tr>
               </thead>
               <tbody>
                 {students.map((student) => {
                   const stats = getStudentStats(student);
                   return (
-                    <tr key={student.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-2 font-medium text-gray-800">{student.name}</td>
-                      <td className="py-2 px-2 text-center text-gray-600">{stats.transactionCount}</td>
-                      <td className="py-2 px-2 text-center text-gray-600">{stats.totalSent}</td>
-                      <td className="py-2 px-2 text-center text-gray-600">{stats.totalReceived}</td>
+                    <tr key={student.id} className="border-b border-gray-100 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-700/50">
+                      <td className="py-2 px-2 font-medium text-gray-800 dark:text-zinc-200">{student.name}</td>
+                      <td className="py-2 px-2 text-center text-gray-600 dark:text-zinc-400 dark:text-zinc-400">{stats.transactionCount}</td>
+                      <td className="py-2 px-2 text-center text-gray-600 dark:text-zinc-400 dark:text-zinc-400">{stats.totalSent}</td>
+                      <td className="py-2 px-2 text-center text-gray-600 dark:text-zinc-400 dark:text-zinc-400">{stats.totalReceived}</td>
                       <td className={`py-2 px-2 text-center font-medium ${
                         stats.claimedBalance < 0 ? 'text-red-600' : 'text-green-600'
                       }`}>
@@ -1466,9 +1364,14 @@ export default function TeacherDashboard({
                       </td>
                       <td className="py-2 px-2 text-center">
                         {stats.discrepancy ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-xs">
                             <AlertTriangle className="w-3 h-3" />
                             Sí
+                          </span>
+                        ) : stats.hasOverspent ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full text-xs" title="Ha enviat més del saldo disponible">
+                            <HelpCircle className="w-3 h-3" />
+                            ?
                           </span>
                         ) : (
                           <span className="text-green-500">✔</span>
@@ -1482,7 +1385,7 @@ export default function TeacherDashboard({
           </div>
 
           {students.length === 0 && (
-            <p className="text-center text-gray-500 py-4">No hi ha estudiants encara</p>
+            <p className="text-center text-gray-500 dark:text-zinc-500 py-4">No hi ha estudiants encara</p>
           )}
         </motion.div>
 
@@ -1495,12 +1398,12 @@ export default function TeacherDashboard({
         >
           <div className="flex items-center gap-2 mb-4">
             <Eye className="w-5 h-5 text-violet-500" />
-            <h2 className="font-semibold text-gray-800">{t('transactionRegistry')}</h2>
+            <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('transactionRegistry')}</h2>
           </div>
 
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {transactions.length === 0 ? (
-              <p className="text-center text-gray-500 py-4">No hi ha transaccions encara</p>
+              <p className="text-center text-gray-500 dark:text-zinc-500 py-4">No hi ha transaccions encara</p>
             ) : (
               transactions.map((tx) => {
                 const isSuspicious = isTransactionSuspicious(tx);
@@ -1511,19 +1414,19 @@ export default function TeacherDashboard({
                     animate={{ opacity: 1, x: 0 }}
                     className={`p-3 rounded-lg flex items-center justify-between ${
                       tx.isHighlighted
-                        ? 'bg-amber-100 border-2 border-amber-400'
+                        ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-400 dark:border-amber-500/50'
                         : isSuspicious
-                        ? 'bg-red-50 border-l-4 border-red-400'
-                        : 'bg-gray-50'
+                        ? 'bg-red-50 dark:bg-red-500/10 border-l-4 border-red-400 dark:border-red-500'
+                        : 'bg-gray-50 dark:bg-zinc-800'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-700">{tx.sender?.name}</span>
+                      <span className="font-medium text-gray-700 dark:text-zinc-300">{tx.sender?.name}</span>
                       <span className="text-gray-400">→</span>
-                      <span className="font-medium text-gray-700">{tx.receiver?.name}</span>
-                      <span className="text-amber-600 font-semibold">{tx.amount} 🪙</span>
+                      <span className="font-medium text-gray-700 dark:text-zinc-300">{tx.receiver?.name}</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold">{tx.amount} <i className="fa-solid fa-cent-sign" /></span>
                       {isSuspicious && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-xs">
                           <AlertTriangle className="w-3 h-3" />
                           Saldo insuficient
                         </span>
@@ -1534,8 +1437,8 @@ export default function TeacherDashboard({
                       onClick={() => onHighlightTransaction(tx.id, !tx.isHighlighted)}
                       className={`p-2 rounded-lg transition-colors ${
                         tx.isHighlighted
-                          ? 'bg-amber-200 text-amber-700'
-                          : 'hover:bg-gray-200 text-gray-400'
+                          ? 'bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400'
+                          : 'hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-400 dark:text-zinc-500'
                       }`}
                       title={t('highlightTransaction')}
                     >
@@ -1549,167 +1452,6 @@ export default function TeacherDashboard({
         </motion.div>
       </div>
 
-      {/* Phase Instructions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        className="zone-card bg-gradient-to-br from-blue-50 to-indigo-50"
-      >
-        {currentPhase === 0 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase0InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase0Instruction1')} {t('phase0Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase0Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase0Activity1')}</li>
-                <li>{t('phase0Activity2')}</li>
-                <li>{t('phase0Activity3')}</li>
-                <li>{t('phase0Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 1 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase1InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase1Instruction1')} {t('phase1Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase1Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase1Activity1')}</li>
-                <li>{t('phase1Activity2')}</li>
-                <li>{t('phase1Activity3')}</li>
-                <li>{t('phase1Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 2 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase2InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase2Instruction1')} {t('phase2Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase2Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase2Activity1')}</li>
-                <li>{t('phase2Activity2')}</li>
-                <li>{t('phase2Activity3')}</li>
-                <li>{t('phase2Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 3 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase3InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase3Instruction1')} {t('phase3Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase3Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase3Activity1')}</li>
-                <li>{t('phase3Activity2')}</li>
-                <li>{t('phase3Activity3')}</li>
-                <li>{t('phase3Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 4 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase4InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase4Instruction1')} {t('phase4Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase4Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase4Activity1')}</li>
-                <li>{t('phase4Activity2')}</li>
-                <li>{t('phase4Activity3')}</li>
-                <li>{t('phase4Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 5 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase5InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase5Instruction1')} {t('phase5Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase5Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase5Activity1')}</li>
-                <li>{t('phase5Activity2')}</li>
-                <li>{t('phase5Activity3')}</li>
-                <li>{t('phase5Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 6 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase6InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase6Instruction1')} {t('phase6Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase6Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase6Activity1')}</li>
-                <li>{t('phase6Activity2')}</li>
-                <li>{t('phase6Activity3')}</li>
-                <li>{t('phase6Activity4')}</li>
-              </ul>
-            </div>
-          </>
-        ) : currentPhase === 9 ? (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">{t('phase9InstructionTitle')}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>
-                {t('phase9Instruction1')} {t('phase9Instruction2')}
-              </p>
-              <p className="mt-2">
-                <strong>{t('phase9Activities')}</strong>
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-1">
-                <li>{t('phase9Activity1')}</li>
-                <li>{t('phase9Activity2')}</li>
-                <li>{t('phase9Activity3')}</li>
-                <li>{t('phase9Activity4')}</li>
-                <li>{t('phase9Activity5')}</li>
-              </ul>
-            </div>
-          </>
-        ) : (
-          <>
-            <h3 className="font-semibold text-gray-800 mb-3">Fase {currentPhase}</h3>
-            <div className="prose prose-sm max-w-none text-gray-600">
-              <p>{t('phaseInstructionsComingSoon')}</p>
-            </div>
-          </>
-        )}
-      </motion.div>
     </div>
   );
 }
