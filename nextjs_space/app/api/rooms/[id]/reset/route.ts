@@ -3,7 +3,6 @@ import { store } from '@/lib/store';
 import { createInitialCoinFile } from '@/lib/room-utils';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Reset phase (delete all transactions, reset coin files)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {

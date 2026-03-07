@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Simple hash function for educational purposes
 function simpleHash(message: string): string {

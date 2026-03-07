@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Generate a human-readable transaction ID
 function generateTxId(roomId: string): string {

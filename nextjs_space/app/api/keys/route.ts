@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 
-export const dynamic = 'force-dynamic';
 
 // Simplified cryptography for educational purposes
 function generateSimpleKeyPair(): { publicKey: string; privateKey: string } {

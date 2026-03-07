@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Helper function to update coin file balance
 function updateCoinFileBalance(coinFile: string, delta: number): string {

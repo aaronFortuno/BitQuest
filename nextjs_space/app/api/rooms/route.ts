@@ -3,7 +3,6 @@ import { store } from '@/lib/store';
 import { generateRoomCode, createInitialCoinFile } from '@/lib/room-utils';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Create a new room (teacher)
 export async function POST(req: NextRequest) {

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Update room phase
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

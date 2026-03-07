@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
-export const dynamic = 'force-dynamic';
 
 // Change the bank (assign bank role to a different participant)
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {

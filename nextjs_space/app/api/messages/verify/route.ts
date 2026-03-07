@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 
-export const dynamic = 'force-dynamic';
 
 // Simple hash function
 function simpleHash(message: string): string {
