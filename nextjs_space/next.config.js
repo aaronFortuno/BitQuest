@@ -17,7 +17,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  trailingSlash: true,
+  trailingSlash: isStaticExport,
   images: { unoptimized: true },
 };
 
