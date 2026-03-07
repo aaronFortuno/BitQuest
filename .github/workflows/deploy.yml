@@ -29,6 +29,9 @@ jobs:
         working-directory: nextjs_space
         run: npm ci --legacy-peer-deps
 
+      - name: Remove API routes (served by backend, not needed for static export)
+        run: rm -rf nextjs_space/app/api nextjs_space/middleware.ts
+
       - name: Build static export
         working-directory: nextjs_space
         run: npm run build:static
