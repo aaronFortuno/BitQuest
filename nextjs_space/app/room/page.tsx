@@ -81,6 +81,7 @@ export default function RoomPage() {
     approveTransaction,
     rejectTransaction,
     toggleBankDisconnection,
+    updateTransferLimit,
     voteOnTransaction,
     forceTransaction,
     generateKeys,
@@ -121,6 +122,7 @@ export default function RoomPage() {
     mineSimulationBlock,
     fillSimulationMempool,
     accelerateHalvings,
+    updateParticipantCoinFile,
     refetch,
   } = useRoomPolling({
     roomId: code || null,
@@ -386,6 +388,7 @@ export default function RoomPage() {
             economicStats={economicStats}
             onHighlightTransaction={highlightTransaction}
             onToggleBankDisconnection={toggleBankDisconnection}
+            onUpdateTransferLimit={updateTransferLimit}
             onApproveTransaction={approveTransaction}
             onRejectTransaction={rejectTransaction}
             onForceTransaction={forceTransaction}
@@ -408,6 +411,7 @@ export default function RoomPage() {
             onEndChallenge={endChallenge}
             onFillSimulationMempool={fillSimulationMempool}
             onAccelerateHalvings={accelerateHalvings}
+            onUpdateParticipantBalance={updateParticipantCoinFile}
           />
         ) : (
           renderStudentInterface()

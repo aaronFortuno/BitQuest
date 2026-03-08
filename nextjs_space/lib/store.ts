@@ -11,6 +11,7 @@ export interface RoomData {
   currentPhase: number;
   unlockedPhases: number[];
   isBankDisconnected: boolean;
+  maxTransferAmount: number;
   difficultyAdjustmentInterval: number;
   targetBlockTime: number;
   currentDifficulty: number;
@@ -190,6 +191,7 @@ function createRoomState(code: string): RoomState {
       currentPhase: 0,
       unlockedPhases: [0],
       isBankDisconnected: false,
+      maxTransferAmount: 5,
       difficultyAdjustmentInterval: 10,
       targetBlockTime: 30,
       currentDifficulty: 2,

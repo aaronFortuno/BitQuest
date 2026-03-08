@@ -53,6 +53,7 @@ export interface Room {
   currentPhase: number;
   unlockedPhases: number[];
   isBankDisconnected: boolean;
+  maxTransferAmount: number;
   // Phase 7: Difficulty adjustment settings
   difficultyAdjustmentInterval: number;
   targetBlockTime: number;

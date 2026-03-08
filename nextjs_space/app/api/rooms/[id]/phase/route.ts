@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
+import { createInitialCoinFile } from '@/lib/room-utils';
 
 
 // Update room phase
@@ -16,6 +17,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (currentPhase !== undefined) {
       state.room.currentPhase = currentPhase;
+
+      // Reset transactions and balances when entering Phase 1
+      if (currentPhase === 1) {
+        state.transactions.clear();
+        for (const p of state.participants.values()) {
+          if (p.isActive) {
+            p.coinFile = createInitialCoinFile(p.name);
+          }
+        }
+      }
     }
 
     if (unlockPhase !== undefined) {

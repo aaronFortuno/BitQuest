@@ -130,8 +130,8 @@ export default function LandingPage() {
             >
               <Coins className="w-10 h-10 text-white" />
             </motion.div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-zinc-100">{t('appName')}</h1>
-            <p className="text-gray-600 dark:text-zinc-400 mt-2">{t('subtitle')}</p>
+            <h1 className="text-3xl font-bold text-heading">{t('appName')}</h1>
+            <p className="text-secondary mt-2">{t('subtitle')}</p>
           </div>
 
         {/* Main Card */}
@@ -142,7 +142,7 @@ export default function LandingPage() {
               animate={{ opacity: 1 }}
               className="space-y-4"
             >
-              <p className="text-center text-gray-600 dark:text-zinc-400 mb-6">{t('welcomeSubtitle')}</p>
+              <p className="text-center text-secondary mb-6">{t('welcomeSubtitle')}</p>
               
               <button
                 onClick={() => setMode('create')}
@@ -153,8 +153,8 @@ export default function LandingPage() {
                     <GraduationCap className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold text-gray-800 dark:text-zinc-100">{t('createRoom')}</p>
-                    <p className="text-sm text-gray-500 dark:text-zinc-400">{t('teacher')}</p>
+                    <p className="font-semibold text-heading">{t('createRoom')}</p>
+                    <p className="text-sm text-muted">{t('teacher')}</p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-amber-500 group-hover:translate-x-1 transition-transform" />
@@ -169,8 +169,8 @@ export default function LandingPage() {
                     <Users className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold text-gray-800 dark:text-zinc-100">{t('joinRoom')}</p>
-                    <p className="text-sm text-gray-500 dark:text-zinc-400">{t('student')}</p>
+                    <p className="font-semibold text-heading">{t('joinRoom')}</p>
+                    <p className="text-sm text-muted">{t('student')}</p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-violet-500 group-hover:translate-x-1 transition-transform" />
@@ -190,7 +190,7 @@ export default function LandingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t('enterYourName')}
                 </label>
                 <input
@@ -237,7 +237,7 @@ export default function LandingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t('enterYourName')}
                 </label>
                 <input
@@ -251,7 +251,7 @@ export default function LandingPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-body mb-2">
                   {t('enterRoomCode')}
                 </label>
                 <input
@@ -291,7 +291,7 @@ export default function LandingPage() {
           <div className="mt-6 text-center">
             <button 
               onClick={() => setShowHelp(true)}
-              className="inline-flex items-center gap-1 text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200 text-sm"
+              className="inline-flex items-center gap-1 text-muted hover:text-gray-700 dark:hover:text-zinc-200 text-sm"
             >
               <HelpCircle className="w-4 h-4" />
               {t('help')}

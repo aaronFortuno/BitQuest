@@ -29,16 +29,16 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
             className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+            <div className="p-4 border-b border-subtle flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-amber-500" />
-                <h2 className="font-semibold text-gray-800 dark:text-zinc-100">{t('help')}</h2>
+                <h2 className="font-semibold text-heading">{t('help')}</h2>
               </div>
               <button
                 onClick={onClose}
                 className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-gray-500 dark:text-zinc-400" />
+                <X className="w-5 h-5 text-muted" />
               </button>
             </div>
 
@@ -48,8 +48,8 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                   <Coins className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-800 dark:text-zinc-100">Què és BitQuest?</p>
-                  <p className="text-sm text-gray-600 dark:text-zinc-400">Un simulador educatiu per aprendre com funciona Bitcoin de forma pràctica i progressiva.</p>
+                  <p className="font-medium text-heading">Què és BitQuest?</p>
+                  <p className="text-sm text-secondary">Un simulador educatiu per aprendre com funciona Bitcoin de forma pràctica i progressiva.</p>
                 </div>
               </div>
 
@@ -58,8 +58,8 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                   <GraduationCap className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-800 dark:text-zinc-100">Com començar?</p>
-                  <p className="text-sm text-gray-600 dark:text-zinc-400">El professor crea una sala i comparteix el codi amb els participants per unir-se.</p>
+                  <p className="font-medium text-heading">Com començar?</p>
+                  <p className="text-sm text-secondary">El professor crea una sala i comparteix el codi amb els participants per unir-se.</p>
                 </div>
               </div>
 
@@ -68,12 +68,12 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                   <Users className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-800 dark:text-zinc-100">Fases progressives</p>
-                  <p className="text-sm text-gray-600 dark:text-zinc-400">Començareu pel problema del doble pagament i anireu descobrint les solucions pas a pas.</p>
+                  <p className="font-medium text-heading">Fases progressives</p>
+                  <p className="text-sm text-secondary">Començareu pel problema del doble pagament i anireu descobrint les solucions pas a pas.</p>
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 dark:text-zinc-500 text-center pt-2">
+              <p className="text-xs text-faint text-center pt-2">
                 Dissenyat per a estudiants de cicle superior de primària fins a batxillerat.
               </p>
             </div>

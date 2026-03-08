@@ -87,8 +87,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
 
     fetchRoom();
 
-    // Fallback polling every 5 seconds (Socket.io handles real-time updates)
-    pollInterval.current = setInterval(fetchRoom, 5000);
+    // Fallback polling every 2 seconds for responsive updates
+    pollInterval.current = setInterval(fetchRoom, 2000);
 
     return () => {
       if (pollInterval.current) {
@@ -263,6 +263,22 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       await fetchRoom();
     } catch (err) {
       console.error('Toggle bank disconnection error:', err);
+    }
+  }, [room, fetchRoom]);
+
+  const updateTransferLimit = useCallback(async (limit: number) => {
+    if (!room) return;
+
+    try {
+      await fetch(apiUrl(`/api/rooms/${room.id}/bank`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxTransferAmount: limit }),
+      });
+
+      await fetchRoom();
+    } catch (err) {
+      console.error('Update transfer limit error:', err);
     }
   }, [room, fetchRoom]);
 
@@ -1342,6 +1358,20 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, fetchRoom]);
 
+  // Update any participant's coin file (teacher editing balances)
+  const updateParticipantCoinFile = useCallback(async (targetId: string, coinFile: string) => {
+    try {
+      await fetch(apiUrl(`/api/participants/${targetId}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coinFile }),
+      });
+      await fetchRoom();
+    } catch (err) {
+      console.error('Update participant coin file error:', err);
+    }
+  }, [fetchRoom]);
+
   return {
     room,
     messages,
@@ -1368,6 +1398,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     rejectTransaction,
     changeBank,
     toggleBankDisconnection,
+    updateTransferLimit,
     voteOnTransaction,
     forceTransaction,
     // Phase 3
@@ -1405,6 +1436,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     mineSimulationBlock,
     fillSimulationMempool,
     accelerateHalvings,
+    updateParticipantCoinFile,
     refetch: fetchRoom,
   };
 }

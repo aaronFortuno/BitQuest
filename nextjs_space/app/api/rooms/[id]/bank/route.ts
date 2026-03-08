@@ -44,9 +44,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id: roomId } = params;
-    const { isBankDisconnected } = await req.json();
+    const { isBankDisconnected, maxTransferAmount } = await req.json();
 
-    const room = store.updateRoom(roomId, { isBankDisconnected });
+    const updateData: Partial<{ isBankDisconnected: boolean; maxTransferAmount: number }> = {};
+    if (isBankDisconnected !== undefined) updateData.isBankDisconnected = isBankDisconnected;
+    if (maxTransferAmount !== undefined) updateData.maxTransferAmount = maxTransferAmount;
+
+    const room = store.updateRoom(roomId, updateData);
 
     const roomCode2 = store.getRoomCodeById(roomId);
     if (roomCode2) broadcastRoomUpdate(roomCode2);

@@ -75,7 +75,7 @@ export default function BankInterface({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="zone-card bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200"
+        className="zone-card phase-panel-emerald"
       >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
@@ -98,21 +98,21 @@ export default function BankInterface({
         >
           <div className="flex items-center gap-2 mb-4">
             <Wallet className="w-5 h-5 text-emerald-500" />
-            <h3 className="font-semibold text-gray-800">{t('allBalances')}</h3>
+            <h3 className="font-semibold text-heading">{t('allBalances')}</h3>
           </div>
 
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {students.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-4">No hi ha usuaris</p>
+              <p className="text-muted text-sm text-center py-4">No hi ha usuaris</p>
             ) : (
               students.map((student) => {
                 const balance = getBalance(student.id);
                 return (
                   <div
                     key={student.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-2 bg-surface-alt rounded-lg"
                   >
-                    <span className="font-medium text-gray-700">{student.name}</span>
+                    <span className="font-medium text-body">{student.name}</span>
                     <span className={`font-mono font-semibold ${
                       balance < 0 ? 'text-red-600' : 'text-emerald-600'
                     }`}>
@@ -134,19 +134,19 @@ export default function BankInterface({
         >
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-violet-500" />
-            <h3 className="font-semibold text-gray-800">Estadístiques</h3>
+            <h3 className="font-semibold text-heading">Estadístiques</h3>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 bg-amber-50 rounded-lg text-center">
+            <div className="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-lg text-center">
               <p className="text-2xl font-bold text-amber-600">{pendingTransactions.length}</p>
               <p className="text-xs text-amber-700">{t('pending')}</p>
             </div>
-            <div className="p-3 bg-emerald-50 rounded-lg text-center">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-center">
               <p className="text-2xl font-bold text-emerald-600">{approvedTransactions.length}</p>
               <p className="text-xs text-emerald-700">{t('approved')}</p>
             </div>
-            <div className="p-3 bg-red-50 rounded-lg text-center">
+            <div className="p-3 bg-red-50 dark:bg-red-500/10 rounded-lg text-center">
               <p className="text-2xl font-bold text-red-600">{rejectedTransactions.length}</p>
               <p className="text-xs text-red-700">{t('rejected')}</p>
             </div>
@@ -163,9 +163,9 @@ export default function BankInterface({
       >
         <div className="flex items-center gap-2 mb-4">
           <Clock className="w-5 h-5 text-amber-500" />
-          <h3 className="font-semibold text-gray-800">{t('pendingRequests')}</h3>
+          <h3 className="font-semibold text-heading">{t('pendingRequests')}</h3>
           {pendingTransactions.length > 0 && (
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+            <span className="px-2 py-0.5 badge-amber rounded-full text-xs font-medium">
               {pendingTransactions.length}
             </span>
           )}
@@ -173,7 +173,7 @@ export default function BankInterface({
 
         <div className="space-y-3">
           {pendingTransactions.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">No hi ha sol·licituds pendents</p>
+            <p className="text-muted text-sm text-center py-8">No hi ha sol·licituds pendents</p>
           ) : (
             pendingTransactions.map((tx) => {
               const senderBalance = getBalance(tx.senderId);
@@ -184,23 +184,23 @@ export default function BankInterface({
                   key={tx.id}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="p-4 bg-gray-50 rounded-xl border-2 border-amber-200"
+                  className="p-4 bg-surface-alt rounded-xl border-2 border-amber-200 dark:border-amber-500/30"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="font-medium text-gray-800">
+                      <p className="font-medium text-heading">
                         <span className="text-amber-600">{tx.sender?.name}</span>
                         {' '}{t('wantsToSend')}{' '}
                         <span className="font-bold">{tx.amount}</span>
                         {' '}{t('coinsTo')}{' '}
                         <span className="text-violet-600">{tx.receiver?.name}</span>
                       </p>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-muted mt-1">
                         {t('balanceOf')} {tx.sender?.name}: <span className={hasSufficientBalance ? 'text-emerald-600' : 'text-red-600'}>{senderBalance}</span>
                       </p>
                     </div>
                     <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                      hasSufficientBalance ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      hasSufficientBalance ? 'badge-green' : 'badge-red'
                     }`}>
                       {hasSufficientBalance ? (
                         <><CheckCircle className="w-3 h-3" /> {t('sufficientBalance')}</>
@@ -244,12 +244,12 @@ export default function BankInterface({
       >
         <div className="flex items-center gap-2 mb-4">
           <CheckCircle className="w-5 h-5 text-emerald-500" />
-          <h3 className="font-semibold text-gray-800">{t('transactionRegistry')}</h3>
+          <h3 className="font-semibold text-heading">{t('transactionRegistry')}</h3>
         </div>
 
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {[...approvedTransactions, ...rejectedTransactions].length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-4">No hi ha transaccions processades</p>
+            <p className="text-muted text-sm text-center py-4">No hi ha transaccions processades</p>
           ) : (
             [...approvedTransactions, ...rejectedTransactions]
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -257,7 +257,7 @@ export default function BankInterface({
                 <div
                   key={tx.id}
                   className={`flex items-center justify-between p-2 rounded-lg ${
-                    tx.status === 'approved' ? 'bg-emerald-50' : 'bg-red-50'
+                    tx.status === 'approved' ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -266,7 +266,7 @@ export default function BankInterface({
                     ) : (
                       <XCircle className="w-4 h-4 text-red-500" />
                     )}
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-body">
                       {tx.sender?.name} → {tx.receiver?.name}
                     </span>
                     <span className="text-sm font-semibold text-amber-600">{tx.amount} <i className="fa-solid fa-cent-sign" /></span>

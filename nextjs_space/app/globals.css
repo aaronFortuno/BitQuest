@@ -116,3 +116,47 @@ body {
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
 }
+
+/* === Semantic theme classes === */
+
+/* Backgrounds */
+.bg-surface         { @apply bg-white dark:bg-zinc-800; }
+.bg-surface-alt     { @apply bg-gray-50 dark:bg-zinc-700/50; }
+
+/* Text */
+.text-heading       { @apply text-gray-800 dark:text-zinc-100; }
+.text-body          { @apply text-gray-700 dark:text-zinc-300; }
+.text-secondary     { @apply text-gray-600 dark:text-zinc-400; }
+.text-muted         { @apply text-gray-500 dark:text-zinc-500; }
+.text-faint         { @apply text-gray-400 dark:text-zinc-600; }
+
+/* Borders */
+.border-default     { @apply border-gray-200 dark:border-zinc-700; }
+.border-subtle      { @apply border-gray-100 dark:border-zinc-800; }
+
+/* Phase gradient panels */
+.phase-panel-emerald { @apply bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200
+                              dark:from-emerald-900/20 dark:to-teal-900/20 dark:border-emerald-500/30; }
+.phase-panel-purple  { @apply bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200
+                              dark:from-purple-900/20 dark:to-indigo-900/20 dark:border-purple-500/30; }
+.phase-panel-indigo  { @apply bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200
+                              dark:from-indigo-900/20 dark:to-purple-900/20 dark:border-indigo-500/30; }
+.phase-panel-amber   { @apply bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200
+                              dark:from-amber-900/20 dark:to-yellow-900/20 dark:border-amber-500/30; }
+.phase-panel-orange  { @apply bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-200
+                              dark:from-orange-900/20 dark:to-yellow-900/20 dark:border-orange-500/30; }
+.phase-panel-blue    { @apply bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200
+                              dark:from-blue-900/20 dark:to-cyan-900/20 dark:border-blue-500/30; }
+.phase-panel-red     { @apply bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200
+                              dark:from-red-900/20 dark:to-orange-900/20 dark:border-red-500/30; }
+.phase-panel-violet  { @apply bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-200
+                              dark:from-violet-900/20 dark:to-purple-900/20 dark:border-violet-500/30; }
+.phase-panel-yellow  { @apply bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200
+                              dark:from-yellow-900/20 dark:to-orange-900/20 dark:border-yellow-500/30; }
+
+/* Badge pills (status labels) */
+.badge-green   { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400; }
+.badge-red     { @apply bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400; }
+.badge-amber   { @apply bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400; }
+.badge-purple  { @apply bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400; }
+.badge-blue    { @apply bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400; }

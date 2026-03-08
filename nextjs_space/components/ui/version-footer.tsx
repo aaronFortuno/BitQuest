@@ -5,9 +5,54 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.0';
+const VERSION = 'v0.4.1';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.1',
+    date: '2026-03-08',
+    changes: {
+      ca: [
+        'Fase 1 polida i llesta per producció',
+        'Reset automàtic de transaccions i saldos en entrar a Fase 1',
+        'Saldos editables pel professor a la taula "Comptes del banc"',
+        'Panell del banc compactat en 1 fila: botó + límit lliure numèric',
+        'Detecció de "Saldo insuficient" corregida (només compta transaccions aprovades)',
+        'Badge "Saldo insuficient" al registre de transaccions aprovades sospitoses',
+        'Interfície alumne reestructurada: layout 2 columnes (era 3)',
+        'Formulari de transferència compacte en 1 fila: selector + import + botó',
+        'Transaccions estil bancari: vermell (enviat), verd (rebut), taronja (pendent), gris (rebutjada)',
+        'Eliminat panell d\'instruccions redundant a la interfície alumne',
+        'Polling reduït de 5s a 2s per actualitzacions més ràpides',
+      ],
+      es: [
+        'Fase 1 pulida y lista para producción',
+        'Reset automático de transacciones y saldos al entrar en Fase 1',
+        'Saldos editables por el profesor en la tabla "Cuentas del banco"',
+        'Panel del banco compactado en 1 fila: botón + límite libre numérico',
+        'Detección de "Saldo insuficiente" corregida (solo cuenta transacciones aprobadas)',
+        'Badge "Saldo insuficiente" en el registro de transacciones aprobadas sospechosas',
+        'Interfaz alumno reestructurada: layout 2 columnas (era 3)',
+        'Formulario de transferencia compacto en 1 fila: selector + importe + botón',
+        'Transacciones estilo bancario: rojo (enviado), verde (recibido), naranja (pendiente), gris (rechazada)',
+        'Eliminado panel de instrucciones redundante en la interfaz alumno',
+        'Polling reducido de 5s a 2s para actualizaciones más rápidas',
+      ],
+      en: [
+        'Phase 1 polished and production-ready',
+        'Auto-reset transactions and balances when entering Phase 1',
+        'Editable balances for teacher in "Bank accounts" table',
+        'Bank panel compacted to 1 row: button + numeric free limit',
+        'Fixed "Insufficient balance" detection (only counts approved transactions)',
+        '"Insufficient balance" badge on suspicious approved transactions',
+        'Student interface restructured: 2-column layout (was 3)',
+        'Compact transfer form in 1 row: selector + amount + button',
+        'Bank-style transactions: red (sent), green (received), orange (pending), grey (rejected)',
+        'Removed redundant instructions panel from student interface',
+        'Polling reduced from 5s to 2s for faster updates',
+      ],
+    },
+  },
   {
     version: 'v0.4.0',
     date: '2026-03-07',
