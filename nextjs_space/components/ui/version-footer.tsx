@@ -5,9 +5,45 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.2';
+const VERSION = 'v0.4.3';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.3',
+    date: '2026-03-08',
+    changes: {
+      ca: [
+        'Fase 3 (WIP): Signatures digitals i criptografia de clau pública',
+        'Motor criptogràfic educatiu: miniHash 24-bit + RSA amb primers petits',
+        'Panell criptogràfic interactiu per entendre hash, claus i signatures',
+        'Generació de claus RSA educatives (primers petits per transparència)',
+        'Signatura i verificació de missatges amb visualització pas a pas',
+        'Canal públic de missatges signats amb verificació inline',
+        'Missatges falsos del professor per demostrar la importància de les signatures',
+        'Arquitectura de fases documentada (PHASE-ARCHITECTURE.md)',
+      ],
+      es: [
+        'Fase 3 (WIP): Firmas digitales y criptografía de clave pública',
+        'Motor criptográfico educativo: miniHash 24-bit + RSA con primos pequeños',
+        'Panel criptográfico interactivo para entender hash, claves y firmas',
+        'Generación de claves RSA educativas (primos pequeños para transparencia)',
+        'Firma y verificación de mensajes con visualización paso a paso',
+        'Canal público de mensajes firmados con verificación inline',
+        'Mensajes falsos del profesor para demostrar la importancia de las firmas',
+        'Arquitectura de fases documentada (PHASE-ARCHITECTURE.md)',
+      ],
+      en: [
+        'Phase 3 (WIP): Digital signatures and public key cryptography',
+        'Educational crypto engine: miniHash 24-bit + RSA with small primes',
+        'Interactive crypto panel to understand hashing, keys and signatures',
+        'Educational RSA key generation (small primes for transparency)',
+        'Message signing and verification with step-by-step visualization',
+        'Public signed message channel with inline verification',
+        'Teacher fake messages to demonstrate the importance of signatures',
+        'Phase architecture documented (PHASE-ARCHITECTURE.md)',
+      ],
+    },
+  },
   {
     version: 'v0.4.2',
     date: '2026-03-08',
