@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType } from '@/lib/types';
 import { joinRoom as socketJoinRoom, leaveRoom as socketLeaveRoom, onRoomUpdate } from '@/lib/socket';
 import { apiUrl } from '@/lib/api';
+import { generateRSAKeyPair, serializePublicKey } from '@/lib/crypto';
 
 // Difficulty info from API
 export interface DifficultyInfo {
@@ -56,19 +57,38 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   const [error, setError] = useState<string | null>(null);
   const lastTransactionCount = useRef(0);
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  // Stable ref for room UUID — avoids cascading useCallback/useEffect re-runs
+  const roomUuidRef = useRef<string | null>(null);
+  // Guard against concurrent fetchRoom calls piling up
+  const isFetchingRoom = useRef(false);
 
   const fetchRoom = useCallback(async () => {
     if (!roomId) return;
+    // Skip if a previous fetchRoom is still in-flight
+    if (isFetchingRoom.current) return;
+    isFetchingRoom.current = true;
 
     try {
       const res = await fetch(apiUrl(`/api/rooms?code=${roomId}`));
+      if (res.status === 404) {
+        // Room no longer exists (server restarted or room deleted) — stop polling
+        setRoom(null);
+        setError('Room not found');
+        if (pollInterval.current) {
+          clearInterval(pollInterval.current);
+          pollInterval.current = null;
+        }
+        setLoading(false);
+        return;
+      }
       if (!res.ok) throw new Error('Failed to fetch room');
       const data = await res.json();
-      
+
       if (data.room) {
+        roomUuidRef.current = data.room.id;
         setRoom(data.room as Room);
         setError(null);
-        
+
         // Track new transactions
         const txCount = data.room.transactions?.length ?? 0;
         if (txCount > lastTransactionCount.current) {
@@ -78,6 +98,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     } catch (err) {
       setError('Connection error');
     } finally {
+      isFetchingRoom.current = false;
       setLoading(false);
     }
   }, [roomId]);
@@ -90,10 +111,19 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     // Fallback polling every 2 seconds for responsive updates
     pollInterval.current = setInterval(fetchRoom, 2000);
 
+    // Refetch immediately when tab becomes visible (browsers throttle background intervals)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchRoom();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       if (pollInterval.current) {
         clearInterval(pollInterval.current);
       }
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [roomId, enabled, fetchRoom]);
 
@@ -173,18 +203,24 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   }, [fetchRoom]);
 
   const updatePhase = useCallback(async (currentPhase?: number, unlockPhase?: number) => {
-    if (!room) return;
+    if (!room) {
+      console.warn('[updatePhase] No room, aborting');
+      return;
+    }
 
+    console.log('[updatePhase] Updating phase:', { currentPhase, unlockPhase, roomId: room.id });
     try {
-      await fetch(apiUrl(`/api/rooms/${room.id}/phase`), {
+      const res = await fetch(apiUrl(`/api/rooms/${room.id}/phase`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPhase, unlockPhase }),
       });
-      
+      console.log('[updatePhase] Response:', res.status);
+
       await fetchRoom();
+      console.log('[updatePhase] Room refreshed');
     } catch (err) {
-      console.error('Phase update error:', err);
+      console.error('[updatePhase] Error:', err);
     }
   }, [room, fetchRoom]);
 
@@ -316,19 +352,20 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [participantId, fetchRoom]);
 
-  // Phase 3: Fetch signed messages
+  // Phase 3: Fetch signed messages (uses roomUuidRef for stable reference)
   const fetchMessages = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/messages?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/messages?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch messages');
       const data = await res.json();
       setMessages(data.messages || []);
     } catch (err) {
       console.error('Fetch messages error:', err);
     }
-  }, [room]);
+  }, []);
 
   // Poll messages when in Phase 3
   useEffect(() => {
@@ -338,88 +375,107 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     const msgPoll = setInterval(fetchMessages, 5000);
 
     return () => clearInterval(msgPoll);
-  }, [room?.currentPhase, room?.id, enabled, fetchMessages]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.currentPhase, room?.id, enabled]);
 
-  // Phase 3: Generate key pair for a participant
-  const generateKeys = useCallback(async () => {
-    if (!participantId) return null;
+  // Phase 3: Generate key pair locally (no server call)
+  const generateKeys = useCallback((): { publicKey: string; privateKey: { d: number; p: number; q: number; phi: number }; steps: { p: number; q: number; n: number; phi: number; e: number; d: number } } | null => {
+    if (!participantId) {
+      console.warn('[generateKeys] No participantId, aborting');
+      return null;
+    }
 
+    const { keys, steps } = generateRSAKeyPair();
+    const publicKeyStr = serializePublicKey(keys.publicKey);
+
+    // Store keys in localStorage (never leaves the device)
+    localStorage.setItem(
+      `bitquest_privateKey_${participantId}`,
+      JSON.stringify(keys.privateKey)
+    );
+    localStorage.setItem(
+      `bitquest_publicKey_${participantId}`,
+      JSON.stringify(keys.publicKey)
+    );
+
+    return { publicKey: publicKeyStr, privateKey: keys.privateKey, steps };
+  }, [participantId]);
+
+  // Phase 3: Broadcast public key to the network (register on server)
+  const broadcastPublicKey = useCallback(async (publicKey: string): Promise<boolean> => {
+    if (!participantId) {
+      console.warn('[broadcastPublicKey] No participantId');
+      return false;
+    }
+
+    const url = apiUrl('/api/keys');
+    console.log('[broadcastPublicKey] Sending to server...', { participantId, publicKey, url });
     try {
-      const res = await fetch(apiUrl('/api/keys'), {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId }),
+        body: JSON.stringify({ participantId, publicKey }),
       });
 
-      if (!res.ok) throw new Error('Failed to generate keys');
-      const data = await res.json();
-      
-      await fetchRoom();
-      return { publicKey: data.publicKey, privateKey: data.privateKey };
+      console.log('[broadcastPublicKey] Response:', res.status);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('[broadcastPublicKey] Server error:', errText);
+        return false;
+      }
+
+      fetchRoom();
+      return true;
     } catch (err) {
-      console.error('Generate keys error:', err);
-      return null;
+      console.error('[broadcastPublicKey] Failed:', err);
+      return false;
     }
   }, [participantId, fetchRoom]);
 
-  // Phase 3: Send a signed message
-  const sendSignedMessage = useCallback(async (content: string) => {
-    if (!room || !participantId) return null;
+  // Phase 3: Send a signed message (hash + signature computed client-side)
+  const sendSignedMessage = useCallback(async (content: string, messageHash: string, signature: string) => {
+    const rid = roomUuidRef.current;
+    if (!rid || !participantId) return null;
 
     try {
       const res = await fetch(apiUrl('/api/messages'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          roomId: room.id,
+          roomId: rid,
           senderId: participantId,
           content,
+          messageHash,
+          signature,
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to send message');
+      if (!res.ok) {
+        const errData = await res.text();
+        console.error('Send message server error:', res.status, errData);
+        throw new Error('Failed to send message');
+      }
       const data = await res.json();
-      
+
       await fetchMessages();
       return data as SignedMessage;
     } catch (err) {
       console.error('Send message error:', err);
       return null;
     }
-  }, [room, participantId, fetchMessages]);
-
-  // Phase 3: Verify a message signature
-  const verifyMessage = useCallback(async (messageId: string) => {
-    if (!participantId) return false;
-
-    try {
-      const res = await fetch(apiUrl('/api/messages/verify'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId, verifierId: participantId }),
-      });
-
-      if (!res.ok) throw new Error('Failed to verify message');
-      const data = await res.json();
-      
-      await fetchMessages();
-      return data.isValid;
-    } catch (err) {
-      console.error('Verify message error:', err);
-      return false;
-    }
   }, [participantId, fetchMessages]);
 
   // Phase 3: Send a fake message (teacher demo)
   const sendFakeMessage = useCallback(async (content: string, claimedBy: string) => {
-    if (!room || !participantId) return null;
+    const rid = roomUuidRef.current;
+    if (!rid || !participantId) return null;
 
     try {
       const res = await fetch(apiUrl('/api/messages/fake'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          roomId: room.id,
+          roomId: rid,
           teacherId: participantId,
           content,
           claimedBy,
@@ -428,42 +484,44 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
 
       if (!res.ok) throw new Error('Failed to send fake message');
       const data = await res.json();
-      
+
       await fetchMessages();
       return data as SignedMessage;
     } catch (err) {
       console.error('Send fake message error:', err);
       return null;
     }
-  }, [room, participantId, fetchMessages]);
+  }, [participantId, fetchMessages]);
 
-  // Phase 4: Fetch all UTXOs for the room
+  // Phase 4: Fetch all UTXOs for the room (uses roomUuidRef for stable reference)
   const fetchUtxos = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/utxos?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/utxos?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch UTXOs');
       const data = await res.json();
       setUtxos(data || []);
     } catch (err) {
       console.error('Fetch UTXOs error:', err);
     }
-  }, [room]);
+  }, []);
 
-  // Phase 4: Fetch all UTXO transactions for the room
+  // Phase 4: Fetch all UTXO transactions for the room (uses roomUuidRef for stable reference)
   const fetchUtxoTransactions = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/utxo-transactions?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/utxo-transactions?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch UTXO transactions');
       const data = await res.json();
       setUtxoTransactions(data || []);
     } catch (err) {
       console.error('Fetch UTXO transactions error:', err);
     }
-  }, [room]);
+  }, []);
 
   // Poll UTXOs and UTXO transactions when in Phase 4
   useEffect(() => {
@@ -477,7 +535,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }, 5000);
 
     return () => clearInterval(utxoPoll);
-  }, [room?.currentPhase, room?.id, enabled, fetchUtxos, fetchUtxoTransactions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.currentPhase, room?.id, enabled]);
 
   // Phase 4: Initialize UTXOs for a participant
   const initializeUtxos = useCallback(async () => {
@@ -546,33 +605,35 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, participantId, fetchUtxos, fetchUtxoTransactions]);
 
-  // Phase 5: Fetch mempool transactions
+  // Phase 5: Fetch mempool transactions (uses roomUuidRef for stable reference)
   const fetchMempoolTransactions = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/mempool?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/mempool?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch mempool transactions');
       const data = await res.json();
       setMempoolTransactions(data || []);
     } catch (err) {
       console.error('Fetch mempool transactions error:', err);
     }
-  }, [room]);
+  }, []);
 
-  // Phase 5: Fetch node connections
+  // Phase 5: Fetch node connections (uses roomUuidRef for stable reference)
   const fetchNodeConnections = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/node-connections?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/node-connections?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch node connections');
       const data = await res.json();
       setNodeConnections(data || []);
     } catch (err) {
       console.error('Fetch node connections error:', err);
     }
-  }, [room]);
+  }, []);
 
   // Poll mempool and connections when in Phase 5
   useEffect(() => {
@@ -586,7 +647,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }, 5000);
 
     return () => clearInterval(mempoolPoll);
-  }, [room?.currentPhase, room?.id, enabled, fetchMempoolTransactions, fetchNodeConnections]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.currentPhase, room?.id, enabled]);
 
   // Phase 5: Initialize network connections
   const initializeNetwork = useCallback(async (regenerate = false) => {
@@ -698,15 +760,15 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     await fetchMempoolTransactions();
   }, [room, fetchMempoolTransactions]);
 
-  // Phase 6, 7 & 8: Fetch blocks, difficulty info, halving info, and economic stats
+  // Phase 6, 7 & 8: Fetch blocks, difficulty info, halving info, and economic stats (uses roomUuidRef)
   const fetchBlocks = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/blocks?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/blocks?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch blocks');
       const data = await res.json();
-      // API now returns { blocks: [...], difficultyInfo: {...}, halvingInfo: {...}, economicStats: {...} }
       if (data.blocks) {
         setBlocks(data.blocks);
       }
@@ -722,7 +784,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     } catch (err) {
       console.error('Fetch blocks error:', err);
     }
-  }, [room]);
+  }, []);
 
   // Poll blocks when in Phase 6, 7, or 8
   useEffect(() => {
@@ -736,7 +798,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }, 2000); // Poll every 2s as fallback (Socket.io handles real-time)
 
     return () => clearInterval(blocksPoll);
-  }, [room?.currentPhase, room?.id, enabled, fetchBlocks, fetchMempoolTransactions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.currentPhase, room?.id, enabled]);
 
   // Phase 6: Create pending block
   const createPendingBlock = useCallback(async (): Promise<Block | null> => {
@@ -1051,17 +1114,18 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
 
   // Phase 9: Fetch simulation statistics
   const fetchSimulationStats = useCallback(async () => {
-    if (!room) return;
+    const rid = roomUuidRef.current;
+    if (!rid) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/simulation?roomId=${room.id}`));
+      const res = await fetch(apiUrl(`/api/simulation?roomId=${rid}`));
       if (!res.ok) throw new Error('Failed to fetch simulation stats');
       const data = await res.json();
       setSimulationStats(data);
     } catch (err) {
       console.error('Fetch simulation stats error:', err);
     }
-  }, [room]);
+  }, []);
 
   // Phase 9: Poll simulation stats
   useEffect(() => {
@@ -1078,7 +1142,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }, 5000);
 
     return () => clearInterval(simPoll);
-  }, [room?.currentPhase, room?.id, enabled, fetchSimulationStats, fetchBlocks, fetchMempoolTransactions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.currentPhase, room?.id, enabled]);
 
   // Phase 9: Start simulation
   const startSimulation = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
@@ -1403,8 +1468,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     forceTransaction,
     // Phase 3
     generateKeys,
+    broadcastPublicKey,
     sendSignedMessage,
-    verifyMessage,
     sendFakeMessage,
     // Phase 4
     initializeUtxos,

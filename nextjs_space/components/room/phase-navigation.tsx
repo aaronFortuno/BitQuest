@@ -12,6 +12,8 @@ interface PhaseNavigationProps {
   onClose: () => void;
   onUnlockPhase: (phase: number) => void;
   onGoToPhase: (phase: number) => void;
+  onStudentViewPhase?: (phase: number) => void;
+  studentViewPhase?: number;
 }
 
 const PHASE_NAMES = [
@@ -26,6 +28,8 @@ export default function PhaseNavigation({
   onClose,
   onUnlockPhase,
   onGoToPhase,
+  onStudentViewPhase,
+  studentViewPhase,
 }: PhaseNavigationProps) {
   const { t } = useTranslation();
 
@@ -117,7 +121,7 @@ export default function PhaseNavigation({
                       </p>
                     </div>
 
-                    {/* Action button (teacher only): go-to / unlock */}
+                    {/* Action button (teacher): go-to / unlock */}
                     {isTeacher && !isCurrent && (
                       <button
                         onClick={() => {
@@ -135,6 +139,22 @@ export default function PhaseNavigation({
                             ? 'text-gray-400 dark:text-zinc-500 group-hover:text-gray-600 dark:group-hover:text-zinc-300'
                             : 'text-gray-400 dark:text-zinc-500 group-hover:text-amber-600 dark:group-hover:text-amber-400'
                         }`} />
+                      </button>
+                    )}
+
+                    {/* Action button (student): navigate to previous phases */}
+                    {!isTeacher && onStudentViewPhase && (isCompleted || isCurrent) && (
+                      <button
+                        onClick={() => {
+                          onStudentViewPhase(phase.id);
+                          onClose();
+                        }}
+                        className={`p-1.5 hover:bg-white dark:hover:bg-zinc-700 rounded-lg transition-colors flex-shrink-0 group ${
+                          studentViewPhase === phase.id ? 'bg-amber-100 dark:bg-amber-500/20' : ''
+                        }`}
+                        title={t('goToPhase')}
+                      >
+                        <LogIn className="w-4 h-4 text-gray-400 dark:text-zinc-500 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors" />
                       </button>
                     )}
                   </div>

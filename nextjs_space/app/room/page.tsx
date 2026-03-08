@@ -15,6 +15,7 @@ import StudentPhaseDropdown from '@/components/room/student-phase-dropdown';
 import Phase1UserInterface from '@/components/room/phase1-user-interface';
 import Phase2UserInterface from '@/components/room/phase2-user-interface';
 import Phase3UserInterface from '@/components/room/phase3-user-interface';
+import Phase3CryptoPanel from '@/components/room/phase3-crypto-panel';
 import Phase4UserInterface from '@/components/room/phase4-user-interface';
 import Phase5UserInterface from '@/components/room/phase5-user-interface';
 import { Phase6UserInterface } from '@/components/room/phase6-user-interface';
@@ -38,6 +39,7 @@ export default function RoomPage() {
   const [showNavigation, setShowNavigation] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [showStudentInstructions, setShowStudentInstructions] = useState(true);
+  const [studentViewPhase, setStudentViewPhase] = useState<number | null>(null);
   const prevPhaseRef = useRef<number>(-1);
 
   useEffect(() => {
@@ -85,9 +87,8 @@ export default function RoomPage() {
     voteOnTransaction,
     forceTransaction,
     generateKeys,
+    broadcastPublicKey,
     sendSignedMessage,
-    verifyMessage,
-    sendFakeMessage,
     initializeUtxos,
     sendUtxoTransaction,
     // Phase 5
@@ -140,6 +141,8 @@ export default function RoomPage() {
     if (roomPhase !== prevPhaseRef.current) {
       prevPhaseRef.current = roomPhase;
       setShowStudentInstructions(true);
+      // Auto-navigate student to the new phase set by teacher
+      setStudentViewPhase(null);
     }
   }, [roomPhase]);
 
@@ -187,9 +190,12 @@ export default function RoomPage() {
     }
   })();
 
-  // Render student interface based on current phase
+  // The phase the student is viewing (defaults to teacher's current phase)
+  const viewPhase = studentViewPhase ?? currentPhase;
+
+  // Render student interface based on viewed phase
   const renderStudentInterface = () => {
-    if (currentPhase === 0) {
+    if (viewPhase === 0) {
       return (
         <StudentInterface
           room={room}
@@ -200,7 +206,7 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 1) {
+    if (viewPhase === 1) {
       return (
         <Phase1UserInterface
           room={room}
@@ -210,7 +216,7 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 2) {
+    if (viewPhase === 2) {
       return (
         <Phase2UserInterface
           room={room}
@@ -223,31 +229,30 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 3) {
+    if (viewPhase === 3) {
       return (
-        <Phase3UserInterface
-          room={room}
-          participant={currentParticipant!}
-          messages={messages}
-          onGenerateKeys={async () => {
-            const result = await generateKeys();
-            if (result) {
+        <div className="space-y-6">
+          <Phase3CryptoPanel defaultCollapsed={true} />
+          <Phase3UserInterface
+            room={room}
+            participant={currentParticipant!}
+            messages={messages}
+            onGenerateKeys={() => {
+              const result = generateKeys();
+              if (!result) throw new Error('Failed to generate keys');
               return result;
-            }
-            throw new Error('Failed to generate keys');
-          }}
-          onSendMessage={async (content) => {
-            const result = await sendSignedMessage(content);
-            if (!result) {
-              throw new Error('Failed to send message');
-            }
-          }}
-          onVerifyMessage={verifyMessage}
-        />
+            }}
+            onBroadcastKey={broadcastPublicKey}
+            onSendMessage={async (content, messageHash, signature) => {
+              const result = await sendSignedMessage(content, messageHash, signature);
+              if (!result) throw new Error('Failed to send message');
+            }}
+          />
+        </div>
       );
     }
 
-    if (currentPhase === 4) {
+    if (viewPhase === 4) {
       return (
         <Phase4UserInterface
           room={room}
@@ -260,7 +265,7 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 5) {
+    if (viewPhase === 5) {
       return (
         <Phase5UserInterface
           room={room}
@@ -273,7 +278,7 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 6 || currentPhase === 7) {
+    if (viewPhase === 6 || viewPhase === 7) {
       return (
         <Phase6UserInterface
           room={room}
@@ -287,7 +292,7 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 8) {
+    if (viewPhase === 8) {
       return (
         <Phase8UserInterface
           room={room}
@@ -306,7 +311,7 @@ export default function RoomPage() {
       );
     }
 
-    if (currentPhase === 9) {
+    if (viewPhase === 9) {
       return (
         <Phase9UserInterface
           room={room}
@@ -346,6 +351,7 @@ export default function RoomPage() {
         onResetPhase={isTeacher ? async () => { await resetPhase(); } : undefined}
         onAdvancePhase={isTeacher ? () => {
           const nextPhase = (room.currentPhase ?? 0) + 1;
+          console.log('[advancePhase] current:', room.currentPhase, 'next:', nextPhase);
           if (nextPhase <= 9) updatePhase(nextPhase, nextPhase);
         } : undefined}
       />
@@ -357,6 +363,10 @@ export default function RoomPage() {
         onClose={() => setShowNavigation(false)}
         onUnlockPhase={(phase) => updatePhase(undefined, phase)}
         onGoToPhase={(phase) => updatePhase(phase)}
+        onStudentViewPhase={!isTeacher ? (phase) => {
+          setStudentViewPhase(phase === currentPhase ? null : phase);
+        } : undefined}
+        studentViewPhase={viewPhase}
       />
 
       <InstructionsPanel
@@ -367,10 +377,22 @@ export default function RoomPage() {
 
       {!isTeacher && (
         <StudentPhaseDropdown
-          currentPhase={currentPhase}
+          currentPhase={viewPhase}
           isOpen={showStudentInstructions}
           onClose={() => setShowStudentInstructions(false)}
         />
+      )}
+
+      {/* "Back to current phase" banner when student is viewing a past phase */}
+      {!isTeacher && studentViewPhase !== null && (
+        <div className="max-w-7xl mx-auto px-4 pt-3 w-full">
+          <button
+            onClick={() => setStudentViewPhase(null)}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+          >
+            ← {t('backToCurrentPhase')} ({t(`phase${currentPhase}`)})
+          </button>
+        </div>
       )}
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
@@ -393,7 +415,17 @@ export default function RoomPage() {
             onRejectTransaction={rejectTransaction}
             onForceTransaction={forceTransaction}
             onVote={voteOnTransaction}
-            onSendFakeMessage={sendFakeMessage}
+            participant={currentParticipant}
+            onGenerateKeys={() => {
+              const result = generateKeys();
+              if (!result) throw new Error('Failed to generate keys');
+              return result;
+            }}
+            onBroadcastKey={broadcastPublicKey}
+            onSendSignedMessage={async (content, messageHash, signature) => {
+              const result = await sendSignedMessage(content, messageHash, signature);
+              if (!result) throw new Error('Failed to send message');
+            }}
             onToggleNodeDisconnection={toggleNodeDisconnection}
             onFillMempool={fillMempool}
             onInitializeNetwork={initializeNetwork}

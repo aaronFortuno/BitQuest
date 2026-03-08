@@ -26,6 +26,9 @@ import {
 } from 'lucide-react';
 import { Room, Transaction, Participant, CoinFile, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, HalvingInfo, EconomicStats, SimulationStats, ChallengeType, ChallengeData } from '@/lib/types';
 import { DifficultyInfo } from '@/hooks/use-room-polling';
+import { type RSAKeyPair, type KeyGenSteps } from '@/lib/crypto';
+import Phase3CryptoPanel from './phase3-crypto-panel';
+import Phase3UserInterface from './phase3-user-interface';
 
 interface TeacherDashboardProps {
   room: Room;
@@ -47,7 +50,11 @@ interface TeacherDashboardProps {
   onRejectTransaction?: (transactionId: string, reason: string) => Promise<void>;
   onForceTransaction?: (transactionId: string, action: 'accept' | 'reject') => Promise<void>;
   onVote?: (transactionId: string, vote: 'for' | 'against') => Promise<void>;
-  onSendFakeMessage?: (content: string, claimedBy: string) => Promise<SignedMessage | null>;
+  // Phase 3 teacher-as-participant
+  participant?: Participant;
+  onGenerateKeys?: () => { publicKey: string; privateKey: RSAKeyPair['privateKey']; steps: KeyGenSteps } | null;
+  onBroadcastKey?: (publicKey: string) => Promise<boolean>;
+  onSendSignedMessage?: (content: string, messageHash: string, signature: string) => Promise<void>;
   // Phase 5
   onToggleNodeDisconnection?: (nodeId: string, isDisconnected: boolean) => Promise<void>;
   onFillMempool?: (count?: number) => Promise<void>;
@@ -91,7 +98,10 @@ export default function TeacherDashboard({
   onRejectTransaction,
   onForceTransaction,
   onVote,
-  onSendFakeMessage,
+  participant,
+  onGenerateKeys,
+  onBroadcastKey,
+  onSendSignedMessage,
   onToggleNodeDisconnection,
   onFillMempool,
   onInitializeNetwork,
@@ -115,9 +125,6 @@ export default function TeacherDashboard({
 }: TeacherDashboardProps) {
   const { t } = useTranslation();
   const [processingTx, setProcessingTx] = useState<string | null>(null);
-  const [fakeMessageContent, setFakeMessageContent] = useState('');
-  const [fakeClaimedBy, setFakeClaimedBy] = useState('');
-  const [sendingFake, setSendingFake] = useState(false);
   // Phase 7 state
   const [newTargetTime, setNewTargetTime] = useState<number>(30);
   const [adjustingDifficulty, setAdjustingDifficulty] = useState(false);
@@ -264,25 +271,160 @@ export default function TeacherDashboard({
     }
   };
 
-  // Phase 3 handlers
-  const handleSendFakeMessage = async () => {
-    if (onSendFakeMessage && fakeMessageContent.trim() && fakeClaimedBy.trim()) {
-      setSendingFake(true);
-      await onSendFakeMessage(fakeMessageContent, fakeClaimedBy);
-      setFakeMessageContent('');
-      setFakeClaimedBy('');
-      setSendingFake(false);
-    }
-  };
-
   // Phase 3 stats
   const studentsWithKeys = students.filter(s => s.publicKey).length;
   const totalMessages = messages.length;
-  const verifiedMessages = messages.filter(m => m.isVerified !== null && m.isVerified !== undefined).length;
-  const invalidMessages = messages.filter(m => m.isVerified === false).length;
 
   return (
     <div className="space-y-6">
+
+      {/* Phase 0: Student Activity + Transaction History */}
+      {currentPhase === 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Student Activity */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="zone-card"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="w-5 h-5 text-indigo-500" />
+              <h2 className="font-semibold text-heading">{t('studentActivity')}</h2>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col className="w-[25%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[18%]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-default">
+                    <th className="text-left py-2 px-2 font-medium text-secondary">{t('name')}</th>
+                    <th className="text-center py-2 px-2 font-medium text-secondary">TX</th>
+                    <th className="text-center py-2 px-2 font-medium text-secondary">{t('sent')}</th>
+                    <th className="text-center py-2 px-2 font-medium text-secondary">{t('received')}</th>
+                    <th className="text-center py-2 px-2 font-medium text-secondary">{t('coinFileBalance')}</th>
+                    <th className="text-center py-2 px-2 font-medium text-secondary">{t('realBalance')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student) => {
+                    const stats = getStudentStats(student);
+                    return (
+                      <tr
+                        key={student.id}
+                        className={`border-b border-subtle hover:bg-surface-alt ${
+                          stats.discrepancy ? 'bg-red-50 dark:bg-red-500/10' : ''
+                        }`}
+                      >
+                        <td className="py-2 px-2 font-medium text-heading flex items-center gap-1">
+                          {student.name}
+                          {stats.discrepancy && (
+                            <span title={t('balanceDiscrepancy')}><AlertTriangle className="w-3.5 h-3.5 text-red-500" /></span>
+                          )}
+                          {stats.hasOverspent && (
+                            <span title={t('overspent')}><AlertCircle className="w-3.5 h-3.5 text-amber-500" /></span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-center text-secondary">{stats.transactionCount}</td>
+                        <td className="py-2 px-2 text-center text-secondary">{stats.totalSent}</td>
+                        <td className="py-2 px-2 text-center text-secondary">{stats.totalReceived}</td>
+                        <td className={`py-2 px-2 text-center font-medium ${
+                          stats.discrepancy ? 'text-red-600' : 'text-body'
+                        }`}>
+                          {stats.claimedBalance}
+                        </td>
+                        <td className="py-2 px-2 text-center font-medium text-emerald-600">
+                          {stats.calculatedBalance}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {students.length === 0 && (
+              <p className="text-center text-muted py-4">{t('noStudentsYet')}</p>
+            )}
+
+            {students.some(s => getStudentStats(s).discrepancy) && (
+              <div className="mt-3 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg">
+                <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  {t('discrepancyDetected')}
+                </p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* Right Column: Transaction History */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="zone-card"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Eye className="w-5 h-5 text-violet-500" />
+              <h2 className="font-semibold text-heading">{t('transactionRegistry')}</h2>
+              <span className="text-xs text-muted ml-auto">{transactions.length} {t('totalTransactions').toLowerCase()}</span>
+            </div>
+
+            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+              {transactions.length === 0 ? (
+                <p className="text-center text-muted py-4">{t('noTransactionsYet')}</p>
+              ) : (
+                [...transactions].sort((a, b) =>
+                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                ).map((tx) => (
+                  <motion.div
+                    key={tx.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={`p-3 rounded-lg flex items-center justify-between ${
+                      isTransactionSuspicious(tx)
+                        ? 'bg-red-50 dark:bg-red-500/10 border-l-4 border-red-400'
+                        : tx.isHighlighted
+                          ? 'bg-amber-50 dark:bg-amber-500/10 border-l-4 border-amber-400'
+                          : 'bg-surface-alt'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-body">{tx.sender?.name}</span>
+                      <span className="text-faint">→</span>
+                      <span className="font-medium text-body">{tx.receiver?.name}</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold">{tx.amount}</span>
+                      {isTransactionSuspicious(tx) && (
+                        <span className="badge-red rounded-full text-xs px-2 py-0.5 inline-flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {t('impossibleTransactions')}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => onHighlightTransaction(tx.id, !tx.isHighlighted)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        tx.isHighlighted
+                          ? 'bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400'
+                          : 'hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-400 dark:text-zinc-500'
+                      }`}
+                      title={t('highlightTransaction')}
+                    >
+                      <Star className={`w-4 h-4 ${tx.isHighlighted ? 'fill-current' : ''}`} />
+                    </button>
+                  </motion.div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Phase 1: 2-column layout */}
       {currentPhase === 1 && (
@@ -852,105 +994,29 @@ export default function TeacherDashboard({
         );
       })()}
 
-      {/* Phase 3 Digital Signatures Control Panel */}
+      {/* Phase 3: Interactive Crypto Panel + Teacher-as-Participant */}
       {currentPhase === 3 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="zone-card phase-panel-indigo"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <UserCog className="w-5 h-5 text-indigo-600" />
-              <h2 className="font-semibold text-heading">{t('phase3')}</h2>
-            </div>
-          </div>
+        <div className="space-y-6">
+          {/* Row 1: Interactive Public Key Cryptography Panel */}
+          <Phase3CryptoPanel />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('studentsWithKeys')}</p>
-              <p className="font-semibold text-indigo-600 text-xl">{studentsWithKeys}/{students.length}</p>
+          {/* Row 2: Teacher uses same interface as students */}
+          {participant && onGenerateKeys && onBroadcastKey && onSendSignedMessage ? (
+            <Phase3UserInterface
+              room={room}
+              participant={participant}
+              messages={messages}
+              onGenerateKeys={onGenerateKeys}
+              onBroadcastKey={onBroadcastKey}
+              onSendMessage={onSendSignedMessage}
+            />
+          ) : (
+            <div className="zone-card">
+              <p className="text-center text-muted py-4">{t('loading')}</p>
             </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('messagesSent')}</p>
-              <p className="font-semibold text-emerald-600 text-xl">{totalMessages}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('signaturesVerified')}</p>
-              <p className="font-semibold text-blue-600 text-xl">{verifiedMessages}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('invalidSignatures')}</p>
-              <p className="font-semibold text-red-600 text-xl">{invalidMessages}</p>
-            </div>
-          </div>
+          )}
 
-          {/* Send Fake Message Demo */}
-          <div className="p-4 bg-surface rounded-lg border border-orange-200 dark:border-orange-500/30">
-            <h3 className="font-medium text-body mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-500" />
-              {t('sendFakeMessageDemo')}
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm text-secondary block mb-1">{t('claimedIdentity')}</label>
-                <select
-                  value={fakeClaimedBy}
-                  onChange={(e) => setFakeClaimedBy(e.target.value)}
-                  className="w-full px-3 py-2 border border-default rounded-lg text-body dark:bg-zinc-700"
-                >
-                  <option value="">{t('selectStudent')}</option>
-                  {students.map(s => (
-                    <option key={s.id} value={s.name}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-secondary block mb-1">{t('fakeMessageContent')}</label>
-                <input
-                  type="text"
-                  value={fakeMessageContent}
-                  onChange={(e) => setFakeMessageContent(e.target.value)}
-                  placeholder={t('fakeMessagePlaceholder')}
-                  className="w-full px-3 py-2 border border-default rounded-lg text-body dark:bg-zinc-700"
-                />
-              </div>
-              <button
-                onClick={handleSendFakeMessage}
-                disabled={sendingFake || !fakeMessageContent.trim() || !fakeClaimedBy}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 dark:disabled:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                {sendingFake ? t('sending') : t('sendFakeMessage')}
-              </button>
-            </div>
-          </div>
-
-          {/* Student Key Status */}
-          <div className="mt-4">
-            <h3 className="font-medium text-body mb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-indigo-500" />
-              {t('studentActivity')}
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {students.map((student) => {
-                const msgCount = messages.filter(m => m.senderId === student.id).length;
-                return (
-                  <div key={student.id} className="p-2 bg-surface rounded-lg">
-                    <p className="text-sm font-medium text-body truncate">{student.name}</p>
-                    <p className="text-xs text-muted flex items-center gap-2">
-                      {student.publicKey ? (
-                        <span className="text-green-600">✅ {t('keysGenerated')}</span>
-                      ) : (
-                        <span className="text-amber-600">⏳ {t('pendingKeys')}</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-faint">{msgCount} {t('messages')}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Phase 4 UTXO Control Panel */}

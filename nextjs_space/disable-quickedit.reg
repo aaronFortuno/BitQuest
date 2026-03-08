@@ -1,0 +1,6 @@
+Windows Registry Editor Version 5.00
+
+; Disable QuickEdit mode for Command Prompt
+; This prevents accidental clicks from freezing Node.js servers
+[HKEY_CURRENT_USER\Console]
+"QuickEdit"=dword:00000000

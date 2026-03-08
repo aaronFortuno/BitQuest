@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
+import { miniHash } from '@/lib/crypto';
 
-
-// Simple hash function
-function simpleHash(message: string): string {
-  let hash = 0;
-  for (let i = 0; i < message.length; i++) {
-    const char = message.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  const hexHash = Math.abs(hash).toString(16).toUpperCase().padStart(6, '0').substring(0, 6);
-  return hexHash;
-}
-
-// Generate a random fake signature
+// Generate a random fake signature (will fail verification)
 function randomSignature(): string {
-  return Math.random().toString(16).substring(2, 8).toUpperCase();
+  return Math.floor(Math.random() * 99999).toString();
 }
 
 // POST: Create a fake demo message (teacher only)
@@ -37,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate hash but use a random (invalid) signature
-    const messageHash = simpleHash(content);
+    const { hash: messageHash } = miniHash(content);
     const fakeSignature = randomSignature();
 
     // Create fake demo message

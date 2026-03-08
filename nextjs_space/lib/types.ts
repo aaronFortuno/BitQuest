@@ -86,7 +86,6 @@ export interface SignedMessage {
   messageHash: string;
   signature: string;
   claimedBy?: string;
-  isVerified?: boolean | null;
   isFakeDemo: boolean;
   createdAt: string;
 }

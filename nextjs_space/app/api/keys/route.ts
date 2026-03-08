@@ -1,52 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
+import { broadcastRoomUpdate } from '@/lib/io';
 
-
-// Simplified cryptography for educational purposes
-function generateSimpleKeyPair(): { publicKey: string; privateKey: string } {
-  const randomHex = () => Math.random().toString(16).substring(2, 8).toUpperCase();
-  const publicKey = randomHex();
-  const privateKey = randomHex();
-  return { publicKey, privateKey };
-}
-
-// POST: Generate keys for a participant
+// POST: Register a public key for a participant (generated client-side)
 export async function POST(request: NextRequest) {
+  console.log('[POST /api/keys] Request received');
   try {
-    const { participantId } = await request.json();
+    const { participantId, publicKey } = await request.json();
+    console.log('[POST /api/keys] participantId:', participantId, 'publicKey:', publicKey);
 
-    if (!participantId) {
-      return NextResponse.json({ error: 'Participant ID required' }, { status: 400 });
+    if (!participantId || !publicKey) {
+      return NextResponse.json({ error: 'Participant ID and public key required' }, { status: 400 });
     }
 
-    const existing = store.getParticipant(participantId);
-
-    if (!existing) {
+    const participant = store.getParticipant(participantId);
+    if (!participant) {
+      console.log('[POST /api/keys] Participant not found');
       return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
     }
 
-    if (existing.publicKey && existing.privateKey) {
-      return NextResponse.json({
-        publicKey: existing.publicKey,
-        privateKey: existing.privateKey,
-        alreadyExisted: true
-      });
+    const alreadyExisted = !!participant.publicKey;
+    store.updateParticipant(participantId, { publicKey });
+
+    // Broadcast so all clients see the new key in the registry
+    const roomCode = store.getRoomCodeById(participant.roomId);
+    if (roomCode) {
+      console.log('[POST /api/keys] Broadcasting to room:', roomCode);
+      broadcastRoomUpdate(roomCode);
     }
 
-    // Generate new key pair
-    const { publicKey, privateKey } = generateSimpleKeyPair();
-
-    // Save to store
-    store.updateParticipant(participantId, { publicKey, privateKey });
-
-    return NextResponse.json({
-      publicKey,
-      privateKey,
-      alreadyExisted: false
-    });
+    console.log('[POST /api/keys] Success');
+    return NextResponse.json({ publicKey, alreadyExisted });
   } catch (error) {
-    console.error('Error generating keys:', error);
-    return NextResponse.json({ error: 'Failed to generate keys' }, { status: 500 });
+    console.error('[POST /api/keys] Error:', error);
+    return NextResponse.json({ error: 'Failed to register public key' }, { status: 500 });
   }
 }
 
@@ -62,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const allParticipants = store.getParticipantsByRoom(roomId);
     const participants = allParticipants
-      .filter(p => p.isActive && p.role === 'student')
+      .filter(p => p.isActive)
       .map(p => ({ id: p.id, name: p.name, publicKey: p.publicKey }));
 
     return NextResponse.json({ participants });

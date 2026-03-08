@@ -72,7 +72,6 @@ export interface SignedMessageData {
   messageHash: string;
   signature: string;
   claimedBy: string | null;
-  isVerified: boolean | null;
   isFakeDemo: boolean;
   createdAt: Date;
 }
@@ -381,7 +380,6 @@ export const store = {
       messageHash: data.messageHash || '',
       signature: data.signature || '',
       claimedBy: data.claimedBy || null,
-      isVerified: data.isVerified ?? null,
       isFakeDemo: data.isFakeDemo || false,
       createdAt: new Date(),
     };
