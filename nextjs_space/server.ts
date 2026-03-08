@@ -12,8 +12,8 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-  // Start server monitor
-  monitor.start();
+  // Server monitor disabled — log file grows indefinitely and not needed now
+  // monitor.start();
 
   const httpServer = createServer((req, res) => {
     // Skip Socket.io requests — they are handled by Socket.io's own middleware

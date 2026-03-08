@@ -5,8 +5,9 @@
     "dev": "tsx server.ts",
     "dev:next": "next dev",
     "build": "next build",
-    "build:static": "NEXT_OUTPUT_MODE=export NEXT_PUBLIC_API_URL=https://bitquest-api.onrender.com next build",
-    "start": "NODE_ENV=production tsx server.ts",
+    "build:static": "cross-env NEXT_OUTPUT_MODE=export NEXT_PUBLIC_API_URL=https://bitquest-api.onrender.com next build",
+    "start": "cross-env NODE_ENV=production tsx server.ts",
+    "local": "next build && cross-env NODE_ENV=production tsx server.ts",
     "lint": "next lint"
   },
   "devDependencies": {
@@ -15,6 +16,7 @@
     "@types/react-dom": "18.2.7",
     "@typescript-eslint/eslint-plugin": "7.0.0",
     "@typescript-eslint/parser": "7.0.0",
+    "cross-env": "^10.1.0",
     "eslint": "9.24.0",
     "eslint-config-next": "15.3.0",
     "eslint-plugin-prettier": "5.1.3",

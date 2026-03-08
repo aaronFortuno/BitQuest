@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Key, User, FileText, Send, CheckCircle, XCircle, AlertTriangle,
+  Key, FileText, Send, CheckCircle, XCircle, AlertTriangle,
   Eye, EyeOff, Lock, Unlock, Hash, Shield, Users, MessageSquare,
-  ChevronDown, ChevronUp, Search, Copy
+  ChevronDown, ChevronUp, Search, Copy, HelpCircle
 } from 'lucide-react';
 import { Room, Participant, SignedMessage } from '@/lib/types';
 import {
@@ -66,7 +66,10 @@ function SignatureAnatomyPanel({
     <div className="space-y-3 text-xs font-mono">
       {/* Step 1: Hash */}
       <div>
-        <p className="text-amber-300 font-sans font-semibold mb-1">{t('phase3.step')} 1: {t('phase3.hashAnatomy')}</p>
+        <p className="text-heading font-sans font-semibold mb-1 flex items-center gap-1">
+          {t('phase3.step')} 1: {t('phase3.hashAnatomy')}
+          <span title={t('phase3.hashTooltip')}><HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" /></span>
+        </p>
         <div className="bg-black/40 rounded p-2 space-y-1 max-h-40 overflow-y-auto">
           <p className="text-gray-400">{t('phase3.initialState')}: {(0x6A09E6).toString(16).toUpperCase()}</p>
           {hashSteps.map((step) => (
@@ -85,7 +88,10 @@ function SignatureAnatomyPanel({
       {/* Step 2: Sign (only if own message) */}
       {signSteps && (
         <div>
-          <p className="text-amber-300 font-sans font-semibold mb-1">{t('phase3.step')} 2: {t('phase3.signatureAnatomy')}</p>
+          <p className="text-heading font-sans font-semibold mb-1 flex items-center gap-1">
+            {t('phase3.step')} 2: {t('phase3.signatureAnatomy')}
+            <span title={t('phase3.signatureTooltip')}><HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" /></span>
+          </p>
           <div className="bg-black/40 rounded p-2 space-y-1">
             <p className="text-gray-300">{t('phase3.hashDecimal')}: {signSteps.hashDecimal}</p>
             <p className="text-gray-300">{t('phase3.hashModN')}: {signSteps.hashDecimal} mod {pubKey!.n} = {signSteps.hashMod}</p>
@@ -97,8 +103,9 @@ function SignatureAnatomyPanel({
       {/* Step 3: Verify */}
       {verifySteps && (
         <div>
-          <p className="text-amber-300 font-sans font-semibold mb-1">
+          <p className="text-heading font-sans font-semibold mb-1 flex items-center gap-1">
             {signSteps ? `${t('phase3.step')} 3` : `${t('phase3.step')} 2`}: {t('phase3.verificationAnatomy')}
+            <span title={t('phase3.verifyTooltip')}><HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" /></span>
           </p>
           <div className="bg-black/40 rounded p-2 space-y-1">
             <p className="text-gray-300">{t('phase3.recoveredHash')}: {verifySteps.computation}</p>
@@ -324,29 +331,15 @@ export default function Phase3UserInterface({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 rounded-xl p-5 border border-purple-500/30"
+        className="zone-card bg-surface"
       >
-        <h3 className="text-lg font-bold text-purple-300 mb-4 flex items-center gap-2">
-          <User className="w-5 h-5" />
-          {t('phase3.myProfile')}
+        <h3 className="text-lg font-bold text-heading mb-4 flex items-center gap-2">
+          <Key className="w-5 h-5" />
+          {participant.name} | {t('phase3.myProfile')}
         </h3>
 
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-purple-500/30 rounded-full flex items-center justify-center">
-              <span className="text-xl">👤</span>
-            </div>
-            <div>
-              <p className="text-sm text-gray-400">{t('name')}</p>
-              <p className="text-lg font-semibold text-white">{participant.name}</p>
-            </div>
-          </div>
-
-          <div className="border-t border-purple-500/20 pt-4">
-            <h4 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              {t('phase3.myKeys')}
-            </h4>
+          <div>
 
             {!hasLocalKeys ? (
               <div className="space-y-3">
@@ -354,7 +347,7 @@ export default function Phase3UserInterface({
                 <button
                   onClick={handleGenerateKeys}
                   disabled={isGeneratingKeys}
-                  className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2 px-4 bg-zinc-600 hover:bg-zinc-700 disabled:opacity-50 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   {isGeneratingKeys ? (
                     <motion.div
@@ -371,45 +364,35 @@ export default function Phase3UserInterface({
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">{t('phase3.publicKey')} (e:n)</p>
-                  <p className="font-mono text-green-400 text-lg">{serializePublicKey(localPublicKey)}</p>
-                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                    <Unlock className="w-3 h-3" />
-                    {isBroadcast ? t('phase3.publicKeyVisible') : t('phase3.keyNotBroadcastYet')}
-                  </p>
-                </div>
-
-                <div className="bg-black/30 rounded-lg p-3">
-                  <p className="text-xs text-gray-400 mb-1">{t('phase3.privateKey')} (d)</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-mono text-red-400 text-lg flex-1">
-                      {showPrivateKey ? localPrivateKey?.d : '••••••'}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-surface-alt rounded-lg p-3">
+                    <p className="text-xs text-gray-400 mb-1">{t('phase3.publicKey')} (e:n)</p>
+                    <p className="font-mono text-green-400 text-lg">{serializePublicKey(localPublicKey)}</p>
+                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <Unlock className="w-3 h-3" />
+                      {isBroadcast ? t('phase3.publicKeyVisible') : t('phase3.keyNotBroadcastYet')}
                     </p>
-                    <button
-                      onClick={() => setShowPrivateKey(!showPrivateKey)}
-                      className="p-1 hover:bg-white/10 rounded"
-                    >
-                      {showPrivateKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
-                  <p className="text-xs text-red-400/70 mt-1 flex items-center gap-1">
-                    <Lock className="w-3 h-3" />
-                    {t('phase3.privateKeySecret')}
-                  </p>
-                </div>
 
-                {/* Key generation steps */}
-                {keyGenSteps && (
-                  <div className="bg-black/20 rounded-lg p-3 text-xs font-mono space-y-1">
-                    <p className="text-purple-300 font-sans font-semibold mb-1">{t('phase3.keyGenSteps')}</p>
-                    <p className="text-gray-300">p = {keyGenSteps.p}, q = {keyGenSteps.q}</p>
-                    <p className="text-gray-300">n = p × q = {keyGenSteps.n}</p>
-                    <p className="text-gray-300">φ(n) = (p-1)(q-1) = {keyGenSteps.phi}</p>
-                    <p className="text-gray-300">e = {keyGenSteps.e}</p>
-                    <p className="text-gray-300">d = e⁻¹ mod φ(n) = {keyGenSteps.d}</p>
+                  <div className="bg-surface-alt rounded-lg p-3">
+                    <p className="text-xs text-gray-400 mb-1">{t('phase3.privateKey')} (d)</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-mono text-red-400 text-lg flex-1">
+                        {showPrivateKey ? localPrivateKey?.d : '••••••'}
+                      </p>
+                      <button
+                        onClick={() => setShowPrivateKey(!showPrivateKey)}
+                        className="p-1 hover:bg-white/10 rounded"
+                      >
+                        {showPrivateKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-red-400/70 mt-1 flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      {t('phase3.privateKeySecret')}
+                    </p>
                   </div>
-                )}
+                </div>
 
                 {!isBroadcast ? (
                   <button
@@ -445,9 +428,9 @@ export default function Phase3UserInterface({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-gradient-to-br from-blue-900/40 to-cyan-900/40 rounded-xl p-5 border border-blue-500/30"
+        className="zone-card bg-surface"
       >
-        <h3 className="text-lg font-bold text-blue-300 mb-4 flex items-center gap-2">
+        <h3 className="text-lg font-bold text-heading mb-4 flex items-center gap-2">
           <Users className="w-5 h-5" />
           {t('phase3.publicKeyRegistry')}
         </h3>
@@ -458,15 +441,15 @@ export default function Phase3UserInterface({
               key={s.id}
               className={`p-2.5 rounded-lg ${
                 s.id === participant.id
-                  ? 'bg-blue-500/20 border border-blue-400/30'
-                  : 'bg-black/20'
+                  ? 'bg-surface-alt border border-amber-400/30'
+                  : 'bg-surface-alt'
               }`}
             >
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="text-sm">{s.id === participant.id ? '👤' : s.role === 'teacher' ? '🎓' : '👥'}</span>
                 <span className="font-medium text-sm truncate">{s.name}</span>
                 {s.id === participant.id && (
-                  <span className="text-xs text-blue-400">({t('you')})</span>
+                  <span className="text-xs text-amber-400">({t('you')})</span>
                 )}
               </div>
               {s.publicKey ? (
@@ -497,8 +480,8 @@ export default function Phase3UserInterface({
           ))}
         </div>
 
-        <div className="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-          <p className="text-xs text-blue-300 flex items-center gap-1">
+        <div className="mt-4 p-3 bg-surface-alt rounded-lg border border-default">
+          <p className="text-xs text-body flex items-center gap-1">
             <Unlock className="w-3 h-3" />
             {t('phase3.everyoneCanSeeKeys')}
           </p>
@@ -510,9 +493,9 @@ export default function Phase3UserInterface({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="bg-gradient-to-br from-amber-900/40 to-orange-900/40 rounded-xl p-5 border border-amber-500/30"
+        className="zone-card bg-surface"
       >
-        <h3 className="text-lg font-bold text-amber-300 mb-4 flex items-center gap-2">
+        <h3 className="text-lg font-bold text-heading mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5" />
           {t('phase3.sendSignedMessage')}
         </h3>
@@ -525,21 +508,21 @@ export default function Phase3UserInterface({
               value={messageContent}
               onChange={(e) => setMessageContent(e.target.value)}
               placeholder={t('phase3.messagePlaceholder')}
-              className="w-full bg-black/30 border border-amber-500/30 rounded-lg p-3 text-white placeholder-gray-500 resize-none h-20 focus:outline-none focus:border-amber-400"
+              className="w-full bg-black/30 border border-default rounded-lg p-3 text-white placeholder-gray-500 resize-none h-20 focus:outline-none focus:border-amber-400"
               disabled={!hasKeys}
             />
           </div>
 
           {/* Signing process */}
-          <div className="bg-black/20 rounded-lg p-3 space-y-3">
-            <p className="text-sm font-semibold text-amber-300 flex items-center gap-2">
+          <div className="bg-surface-alt rounded-lg p-3 space-y-3">
+            <p className="text-sm font-semibold text-heading flex items-center gap-2">
               <Shield className="w-4 h-4" />
               {t('phase3.signingProcess')}
             </p>
 
             {/* Step 1: Hash */}
             <div className="flex items-center gap-3">
-              <span className="w-6 h-6 bg-amber-500/30 rounded-full flex items-center justify-center text-xs">1</span>
+              <span className="w-6 h-6 bg-zinc-600/50 rounded-full flex items-center justify-center text-xs">1</span>
               <div className="flex-1">
                 <p className="text-xs text-gray-400">{t('phase3.messageHash')} (Mini-SHA 24bit)</p>
                 <p className="font-mono text-amber-400">
@@ -557,7 +540,7 @@ export default function Phase3UserInterface({
 
             {/* Step 2: Sign with RSA */}
             <div className="flex items-center gap-3">
-              <span className="w-6 h-6 bg-amber-500/30 rounded-full flex items-center justify-center text-xs">2</span>
+              <span className="w-6 h-6 bg-zinc-600/50 rounded-full flex items-center justify-center text-xs">2</span>
               <div className="flex-1">
                 <p className="text-xs text-gray-400">{t('phase3.signWithPrivateKey')} (RSA: hash^d mod n)</p>
                 <button
@@ -582,7 +565,7 @@ export default function Phase3UserInterface({
 
             {/* Step 3: Signature result */}
             <div className="flex items-center gap-3">
-              <span className="w-6 h-6 bg-amber-500/30 rounded-full flex items-center justify-center text-xs">3</span>
+              <span className="w-6 h-6 bg-zinc-600/50 rounded-full flex items-center justify-center text-xs">3</span>
               <div className="flex-1">
                 <p className="text-xs text-gray-400">{t('phase3.generatedSignature')}</p>
                 <p className="font-mono text-green-400">
@@ -618,9 +601,9 @@ export default function Phase3UserInterface({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 rounded-xl p-5 border border-emerald-500/30"
+        className="zone-card bg-surface"
       >
-        <h3 className="text-lg font-bold text-emerald-300 mb-4 flex items-center gap-2">
+        <h3 className="text-lg font-bold text-heading mb-4 flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
           {t('phase3.publicChannel')}
         </h3>
@@ -643,110 +626,95 @@ export default function Phase3UserInterface({
                   key={msg.id}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className={`p-3 rounded-lg border ${
+                  className={`p-2.5 rounded-lg border text-xs ${
                     isFake
                       ? 'bg-red-900/20 border-red-500/30'
                       : isFromMe
-                        ? 'bg-emerald-500/10 border-emerald-500/30'
-                        : 'bg-black/20 border-gray-600/30'
+                        ? 'bg-surface-alt border-default'
+                        : 'bg-surface-alt border-default'
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        <span>{isFake ? '⚠️' : '👤'}</span>
-                        <span>{t('phase3.from')}: {msg.claimedBy || senderInfo?.name || 'Unknown'}</span>
-                        {isFake && (
-                          <span className="text-xs bg-red-500/30 text-red-300 px-2 py-0.5 rounded">
-                            {t('phase3.claimed')}
-                          </span>
-                        )}
-                      </p>
-                      {senderInfo?.publicKey && (
-                        <p className="text-xs text-gray-400">
-                          {t('phase3.key')}: <span className="font-mono text-cyan-400">{senderInfo.publicKey}</span>
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-500">
+                  {/* Row 1: From + Key + Message + Timestamp */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-body font-medium whitespace-nowrap">
+                      {t('phase3.from')}: {msg.claimedBy || senderInfo?.name || '?'}
+                    </span>
+                    {isFake && (
+                      <span className="bg-red-500/30 text-red-300 px-1.5 py-0.5 rounded text-[10px]">
+                        {t('phase3.claimed')}
+                      </span>
+                    )}
+                    {senderInfo?.publicKey && (
+                      <span className="text-gray-400 whitespace-nowrap">
+                        {t('phase3.key')}: <span className="font-mono text-cyan-400">{senderInfo.publicKey}</span>
+                      </span>
+                    )}
+                    <span className="flex-1 text-body truncate">&quot;{msg.content}&quot;</span>
+                    <span className="text-gray-500 whitespace-nowrap shrink-0">
                       {new Date(msg.createdAt).toLocaleTimeString()}
                     </span>
                   </div>
 
-                  <p className="text-white mb-2 bg-black/20 p-2 rounded">
-                    &quot;{msg.content}&quot;
-                  </p>
-
-                  <div className="text-xs space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-gray-400 space-y-0.5">
-                        <div>Hash: <span className="font-mono text-cyan-400">{msg.messageHash}</span></div>
-                        <div>{t('phase3.signature')}: <span className="font-mono text-amber-400">{msg.signature}</span></div>
-                      </div>
-
-                      {/* Inspect button */}
+                  {/* Row 2: Hash + Sig + Inspect + Verify input + Verify button */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 whitespace-nowrap">
+                      Hash: <span className="font-mono text-cyan-400">{msg.messageHash}</span>
+                    </span>
+                    <span className="text-gray-400 whitespace-nowrap">
+                      Sig: <span className="font-mono text-amber-400">{msg.signature}</span>
+                    </span>
+                    <button
+                      onClick={() => {
+                        setAnatomyMessageId(msg.id);
+                        setShowAnatomy(true);
+                      }}
+                      className="py-0.5 px-1.5 bg-zinc-600 hover:bg-zinc-700 rounded font-medium transition-colors flex items-center gap-0.5 shrink-0"
+                      title={t('phase3.showAnatomy')}
+                    >
+                      <Search className="w-3 h-3" />
+                    </button>
+                    <input
+                      type="text"
+                      placeholder={t('phase3.pasteKeyToVerify')}
+                      value={verifyKeyInputs.get(msg.id) || ''}
+                      onChange={(e) => {
+                        setVerifyKeyInputs(prev => new Map(prev).set(msg.id, e.target.value));
+                        if (verifiedMap.has(msg.id)) {
+                          setVerifiedMap(prev => { const next = new Map(prev); next.delete(msg.id); return next; });
+                        }
+                      }}
+                      className="flex-1 min-w-0 bg-black/30 border border-default rounded px-2 py-0.5 text-white font-mono text-xs placeholder-gray-500 focus:outline-none focus:border-blue-400"
+                    />
+                    {verificationState === undefined ? (
                       <button
-                        onClick={() => {
-                          setAnatomyMessageId(msg.id);
-                          setShowAnatomy(true);
-                        }}
-                        className="py-1 px-2 bg-purple-600 hover:bg-purple-700 rounded text-xs font-medium transition-colors flex items-center gap-1"
-                        title={t('phase3.showAnatomy')}
+                        onClick={() => handleVerify(msg)}
+                        disabled={verifyingId === msg.id || !verifyKeyInputs.get(msg.id)}
+                        className="py-0.5 px-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded font-medium transition-colors flex items-center gap-1 whitespace-nowrap shrink-0"
                       >
-                        <Search className="w-3 h-3" />
-                      </button>
-                    </div>
-
-                    {/* Manual verification: paste public key + verify */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder={t('phase3.pasteKeyToVerify')}
-                        value={verifyKeyInputs.get(msg.id) || ''}
-                        onChange={(e) => {
-                          setVerifyKeyInputs(prev => new Map(prev).set(msg.id, e.target.value));
-                          // Reset verification when key changes
-                          if (verifiedMap.has(msg.id)) {
-                            setVerifiedMap(prev => { const next = new Map(prev); next.delete(msg.id); return next; });
-                          }
-                        }}
-                        className="flex-1 bg-black/30 border border-gray-600/30 rounded px-2 py-1 text-white font-mono text-xs placeholder-gray-500 focus:outline-none focus:border-blue-400"
-                      />
-
-                      {verificationState === undefined ? (
-                        <button
-                          onClick={() => handleVerify(msg)}
-                          disabled={verifyingId === msg.id || !verifyKeyInputs.get(msg.id)}
-                          className="py-1 px-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-medium transition-colors flex items-center gap-1 whitespace-nowrap"
-                        >
-                          {verifyingId === msg.id ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                            >
-                              <Shield className="w-3 h-3" />
-                            </motion.div>
-                          ) : (
+                        {verifyingId === msg.id ? (
+                          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
                             <Shield className="w-3 h-3" />
-                          )}
-                          {t('phase3.verifySignature')}
-                        </button>
-                      ) : verificationState ? (
-                        <span className="flex items-center gap-1 text-green-400 whitespace-nowrap">
-                          <CheckCircle className="w-4 h-4" />
-                          {t('phase3.validSignature')}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-red-400 whitespace-nowrap">
-                          <XCircle className="w-4 h-4" />
-                          {t('phase3.invalidSignature')}
-                        </span>
-                      )}
-                    </div>
+                          </motion.div>
+                        ) : (
+                          <Shield className="w-3 h-3" />
+                        )}
+                        {t('phase3.verifySignature')}
+                      </button>
+                    ) : verificationState ? (
+                      <span className="flex items-center gap-1 text-green-400 whitespace-nowrap shrink-0">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {t('phase3.validSignature')}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-400 whitespace-nowrap shrink-0">
+                        <XCircle className="w-3.5 h-3.5" />
+                        {t('phase3.invalidSignature')}
+                      </span>
+                    )}
                   </div>
 
                   {verificationState === false && (
-                    <div className="mt-2 p-2 bg-red-500/20 rounded border border-red-500/30">
+                    <div className="mt-1.5 p-1.5 bg-red-500/20 rounded border border-red-500/30">
                       <p className="text-xs text-red-300 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
                         {t('phase3.fraudWarning')}
@@ -765,7 +733,7 @@ export default function Phase3UserInterface({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="col-span-full bg-gradient-to-br from-gray-900/60 to-gray-800/60 rounded-xl border border-gray-500/30"
+        className="col-span-full zone-card bg-surface"
       >
         <button
           onClick={() => setShowAnatomy(!showAnatomy)}
@@ -792,7 +760,7 @@ export default function Phase3UserInterface({
                   <select
                     value={anatomyMessageId || ''}
                     onChange={(e) => setAnatomyMessageId(e.target.value || null)}
-                    className="w-full bg-black/30 border border-gray-500/30 rounded-lg p-2 text-white text-sm"
+                    className="w-full bg-black/30 border border-default rounded-lg p-2 text-white text-sm"
                   >
                     <option value="">{t('phase3.selectMessage')}</option>
                     {messages.map(m => (

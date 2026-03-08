@@ -1,5 +1,34 @@
 # UPDATE-PLAN.md - Pla de finalitzacio de BitQuest
 
+## Historial de versions
+
+### v0.4.4 (2026-03-08) — UI Fase 3 polida + monitor desactivat
+
+- **UI Fase 3 neutralitzada**: Els 4 panells (perfil, registre claus, enviar missatge, canal públic) passen de gradients colorits (purple, blue, amber, emerald) a `zone-card bg-surface` gris neutre, coherent amb fases 0-2
+- **Perfil criptogràfic compactat**: Títol inclou nom del participant, avatar eliminat, claus pública/privada en 2 columnes (`grid-cols-2`), bloc "passos de generació" eliminat (redundant amb panell educatiu)
+- **Targetes canal públic compactades**: De 4 files a 2 files (fila 1: remitent+clau+missatge+hora; fila 2: hash+signatura+inspect+verificació)
+- **Colors interiors neutralitzats**: Borders, fons i textos de secció passen a `border-default`, `bg-surface-alt`, `text-heading`; es mantenen colors semàntics (verd=clau pública, vermell=clau privada, cyan=hash, ambre=signatura)
+- **Tooltips anatomia**: Icona HelpCircle amb tooltip als 3 passos (Hash, Signatura, Verificació) del panell d'anatomia
+- **Monitor de servidor desactivat**: `monitor.start()` comentat a `server.ts` per evitar creixement indefinit del fitxer de log
+
+### v0.4.3.1 (2026-03-08) — Fix server freeze
+
+- Desactivat client Socket.io (long-polling exhauria connection pool del navegador)
+
+### v0.4.3 (2026-03-08) — Phase 3 digital signatures
+
+- Merge de Phase 3 (WIP): signatures digitals i motor criptogràfic educatiu
+
+### v0.4.2 (2026-03-08) — Fase 2 polida
+
+- Professor com a participant actiu, UX millorada
+
+### v0.4.1 (2026-03-07) — Fase 1 llesta per producció
+
+- Primera versió estable per a ús educatiu
+
+---
+
 ## Estat actual
 
 El projecte te totes les 10 fases implementades (backend + frontend) sobre Next.js 14 amb **in-memory store** (sense base de dades). La sincronitzacio funciona via HTTP polling cada 2s. Hi ha ~20.000 linies de TypeScript funcionals.
@@ -71,6 +100,14 @@ L'arquitectura actual (Next.js monolitic) no es compatible amb GitHub Pages. Cal
   - `use-room-polling.ts` escolta `room:update` per refetch immediat
   - Polling reduït a 5s (fallback) — era 2s
   - Mining polling reduït a 2s (fallback) — era 1s
+
+- [ ] **2.3** Migració a Socket.io WebSocket-only (LLARG TERMINI)
+  - **Context**: Socket.io HTTP long-polling exhauria el connection pool del navegador (~6 conn/origen), causant freeze total dels clients després de ~60s. Descobert i desactivat a v0.4.3.1 (2026-03-08).
+  - Client Socket.io desactivat temporalment a `use-room-polling.ts` (HTTP polling 2s funciona bé)
+  - Servidor Socket.io (`server.ts` + `lib/io.ts`) segueix actiu però sense clients
+  - **Quan reactivar**: Quan hi hagi sales amb molts usuaris (15+) a fases 6-7-8 (mempool, mining) i el polling HTTP sigui insuficient
+  - **Com reactivar**: Configurar `transports: ['websocket']` tant al client (`lib/socket.ts`) com al servidor (`server.ts`), eliminar fallback a long-polling
+  - **Fitxers afectats**: `lib/socket.ts`, `hooks/use-room-polling.ts`, `server.ts`
 
 ### 3. FASE 7: UI independent per a l'ajust de dificultat
 
