@@ -18,8 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (currentPhase !== undefined) {
       state.room.currentPhase = currentPhase;
 
-      // Reset transactions and balances when entering Phase 1
-      if (currentPhase === 1) {
+      // Reset transactions and balances when entering Phase 1 or Phase 2
+      if (currentPhase === 1 || currentPhase === 2) {
         state.transactions.clear();
         for (const p of state.participants.values()) {
           if (p.isActive) {

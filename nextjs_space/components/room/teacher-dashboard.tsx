@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   GraduationCap,
   Users,
   AlertTriangle,
+  AlertCircle,
   HelpCircle,
   Eye,
   Star,
@@ -19,6 +21,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Send,
+  User,
 } from 'lucide-react';
 import { Room, Transaction, Participant, CoinFile, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, HalvingInfo, EconomicStats, SimulationStats, ChallengeType, ChallengeData } from '@/lib/types';
 import { DifficultyInfo } from '@/hooks/use-room-polling';
@@ -42,6 +46,7 @@ interface TeacherDashboardProps {
   onApproveTransaction?: (transactionId: string) => Promise<void>;
   onRejectTransaction?: (transactionId: string, reason: string) => Promise<void>;
   onForceTransaction?: (transactionId: string, action: 'accept' | 'reject') => Promise<void>;
+  onVote?: (transactionId: string, vote: 'for' | 'against') => Promise<void>;
   onSendFakeMessage?: (content: string, claimedBy: string) => Promise<SignedMessage | null>;
   // Phase 5
   onToggleNodeDisconnection?: (nodeId: string, isDisconnected: boolean) => Promise<void>;
@@ -65,6 +70,7 @@ interface TeacherDashboardProps {
   onFillSimulationMempool?: () => Promise<{ success: boolean; error?: string }>;
   onAccelerateHalvings?: (count: number) => Promise<{ success: boolean; newReward?: number; error?: string }>;
   onUpdateParticipantBalance?: (participantId: string, coinFile: string) => Promise<void>;
+  onProposeTransaction?: (senderId: string, receiverId: string, amount: number, proposedById: string) => Promise<void>;
 }
 
 export default function TeacherDashboard({
@@ -84,6 +90,7 @@ export default function TeacherDashboard({
   onApproveTransaction,
   onRejectTransaction,
   onForceTransaction,
+  onVote,
   onSendFakeMessage,
   onToggleNodeDisconnection,
   onFillMempool,
@@ -104,6 +111,7 @@ export default function TeacherDashboard({
   onFillSimulationMempool,
   onAccelerateHalvings,
   onUpdateParticipantBalance,
+  onProposeTransaction,
 }: TeacherDashboardProps) {
   const { t } = useTranslation();
   const [processingTx, setProcessingTx] = useState<string | null>(null);
@@ -120,6 +128,13 @@ export default function TeacherDashboard({
   const [launchingChallenge, setLaunchingChallenge] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeType>(null);
   const [editingBalances, setEditingBalances] = useState<Record<string, string>>({});
+  // Phase 2 teacher-as-participant state
+  const [selectedSender, setSelectedSender] = useState<string>('');
+  const [selectedReceiver, setSelectedReceiver] = useState<string>('');
+  const [txAmount, setTxAmount] = useState<number>(1);
+  const [txSubmitting, setTxSubmitting] = useState(false);
+  const [txFeedback, setTxFeedback] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
+  const [showReflection, setShowReflection] = useState(false);
   const currentPhase = room?.currentPhase ?? 0;
 
   const transactions = room?.transactions ?? [];
@@ -192,10 +207,13 @@ export default function TeacherDashboard({
   const rejectedTransactions = transactions.filter((tx) => tx.status === 'rejected');
   
   // Phase 2 specific data
-  const votingTransaction = transactions.find((tx) => tx.status === 'voting');
-  const proposedTransactions = transactions.filter((tx) => 
+  const votingTransactions = transactions.filter((tx) => tx.status === 'voting');
+  const proposedTransactions = transactions.filter((tx) =>
     tx.status === 'voting' || tx.status === 'approved' || tx.status === 'rejected'
   );
+  const processedTransactions = transactions.filter((tx) =>
+    tx.status === 'approved' || tx.status === 'rejected'
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
   // Calculate voting participation per student
   const getVotingParticipation = (studentId: string): { voted: number; total: number } => {
@@ -545,124 +563,294 @@ export default function TeacherDashboard({
       )}
 
       {/* Phase 2 Voting Control Panel */}
-      {currentPhase === 2 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="zone-card phase-panel-purple"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-purple-600" />
-              <h2 className="font-semibold text-heading">{t('phase2')}</h2>
-            </div>
-          </div>
+      {currentPhase === 2 && (() => {
+        const teacherParticipant = room.participants?.find(p => p.role === 'teacher');
+        const allParticipants = (room.participants ?? []).filter(p => p.isActive);
+        const teacherBalance = (() => {
+          if (!teacherParticipant?.coinFile) return 10;
+          try { return (JSON.parse(teacherParticipant.coinFile) as CoinFile)?.saldo ?? 10; } catch { return 10; }
+        })();
+        const getBalance = (p: Participant): number => {
+          try { return (JSON.parse(p.coinFile) as CoinFile)?.saldo ?? 0; } catch { return 0; }
+        };
+        const totalVoters = students.length;
+        const otherUsers = allParticipants.filter(p => p.id !== selectedSender);
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('proposedTransactions')}</p>
-              <p className="font-semibold text-purple-600 text-xl">{proposedTransactions.length}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('acceptedTransactions')}</p>
-              <p className="font-semibold text-emerald-600 text-xl">{approvedTransactions.length}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('rejectedTransactions')}</p>
-              <p className="font-semibold text-red-600 text-xl">{rejectedTransactions.length}</p>
-            </div>
-          </div>
+        const handlePropose = async () => {
+          if (!selectedReceiver || txAmount <= 0 || !onProposeTransaction || !teacherParticipant) return;
+          const sender = selectedSender || teacherParticipant.id;
+          setTxSubmitting(true);
+          try {
+            await onProposeTransaction(sender, selectedReceiver, txAmount, teacherParticipant.id);
+            if (sender !== teacherParticipant.id) {
+              setTxFeedback({ type: 'warning', message: t('falseProposalWarning') });
+            } else {
+              setTxFeedback({ type: 'success', message: t('proposalSent') });
+            }
+            setTxAmount(1);
+            setSelectedReceiver('');
+            setSelectedSender(teacherParticipant.id);
+          } catch {
+            setTxFeedback({ type: 'error', message: t('connectionError') });
+          } finally {
+            setTxSubmitting(false);
+            setTimeout(() => setTxFeedback(null), 5000);
+          }
+        };
 
-          {/* Current Voting Proposal */}
-          {votingTransaction && (
-            <div className="mt-4 p-4 bg-surface rounded-lg border-2 border-purple-300 dark:border-purple-500/30">
-              <h3 className="font-medium text-body mb-3 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-purple-500" />
-                {t('currentProposal')}
-              </h3>
-              <div className="space-y-3">
-                <p className="text-heading">
-                  <span className="font-medium">{votingTransaction.sender?.name}</span>
-                  {' → '}
-                  <span className="font-medium">{votingTransaction.receiver?.name}</span>
-                  {': '}
-                  <span className="text-amber-600 font-bold">{votingTransaction.amount} <i className="fa-solid fa-cent-sign" /></span>
-                </p>
-                {votingTransaction.proposedById !== votingTransaction.senderId && (
-                  <p className="text-xs text-orange-500 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    {t('proposedBy')}: {students.find(s => s.id === votingTransaction.proposedById)?.name || 'Unknown'}
+        // Initialize selectedSender to teacher if empty
+        if (!selectedSender && teacherParticipant) {
+          setSelectedSender(teacherParticipant.id);
+        }
+
+        return (
+        <div className="flex flex-col gap-4">
+          {/* Feedback */}
+          <AnimatePresence>
+            {txFeedback && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className={`p-3 rounded-xl border text-sm ${
+                  txFeedback.type === 'success'
+                    ? 'bg-green-500/20 border-green-500/30 text-green-300'
+                    : txFeedback.type === 'error'
+                    ? 'bg-red-500/20 border-red-500/30 text-red-300'
+                    : 'bg-orange-500/20 border-orange-500/30 text-orange-300'
+                }`}
+              >
+                {txFeedback.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4">
+            {/* LEFT COLUMN */}
+            <div className="flex flex-col gap-4">
+              {/* Balance + Form */}
+              <div className="zone-card bg-surface">
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="w-5 h-5 text-purple-500" />
+                  <h3 className="font-semibold text-heading">{teacherParticipant?.name ?? 'Professor'}</h3>
+                  <span className="ml-auto text-amber-500 font-bold text-lg">
+                    {t('availableBalance')}: {teacherBalance} ¢
+                  </span>
+                </div>
+
+                {/* Form row */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedSender}
+                    onChange={(e) => {
+                      setSelectedSender(e.target.value);
+                      if (e.target.value === selectedReceiver) setSelectedReceiver('');
+                    }}
+                    className="flex-1 min-w-0 px-3 py-2 border-2 border-gray-200 dark:border-zinc-600 rounded-lg focus:outline-none focus:border-amber-400 transition-colors bg-white dark:bg-zinc-800 dark:text-zinc-100 text-sm"
+                    disabled={txSubmitting}
+                  >
+                    {allParticipants.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({getBalance(p)}¢)
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedReceiver}
+                    onChange={(e) => setSelectedReceiver(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 border-2 border-gray-200 dark:border-zinc-600 rounded-lg focus:outline-none focus:border-amber-400 transition-colors bg-white dark:bg-zinc-800 dark:text-zinc-100 text-sm"
+                    disabled={txSubmitting}
+                  >
+                    <option value="">-- {t('recipient')} --</option>
+                    {otherUsers.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={txAmount}
+                    onChange={(e) => setTxAmount(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="!w-16 flex-shrink-0 px-2 py-2 border-2 border-gray-200 dark:border-zinc-600 rounded-lg focus:outline-none focus:border-amber-400 transition-colors bg-white dark:bg-zinc-800 dark:text-zinc-100 text-sm text-center"
+                    disabled={txSubmitting}
+                  />
+
+                  <button
+                    onClick={handlePropose}
+                    disabled={txSubmitting || !selectedReceiver}
+                    className="p-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {teacherParticipant && selectedSender !== teacherParticipant.id && (
+                  <p className="text-xs text-orange-400 flex items-center gap-1 mt-2">
+                    <AlertCircle className="w-3 h-3" />
+                    {t('falseProposalWarning')}
                   </p>
                 )}
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-green-600 flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" />
-                    {t('inFavor')}: {votingTransaction.votesFor}
-                  </span>
-                  <span className="text-red-600 flex items-center gap-1">
-                    <XCircle className="w-4 h-4" />
-                    {t('against')}: {votingTransaction.votesAgainst}
-                  </span>
-                  <span className="text-amber-600 flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {t('pendingVotes')}: {students.length - votingTransaction.votesFor - votingTransaction.votesAgainst}
-                  </span>
+              </div>
+
+              {/* Pending Votations */}
+              <div className="zone-card bg-surface flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="w-5 h-5 text-purple-500" />
+                  <h3 className="font-semibold text-heading">{t('pendingVotations')}</h3>
+                  <button
+                    onClick={() => setShowReflection(!showReflection)}
+                    className="ml-auto p-1 text-muted hover:text-body transition-colors"
+                    title={t('consensusQuestion')}
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => onForceTransaction && onForceTransaction(votingTransaction.id, 'accept')}
-                    disabled={processingTx === votingTransaction.id}
-                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 dark:disabled:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    {t('forceAccept')}
-                  </button>
-                  <button
-                    onClick={() => onForceTransaction && onForceTransaction(votingTransaction.id, 'reject')}
-                    disabled={processingTx === votingTransaction.id}
-                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    {t('forceReject')}
-                  </button>
+
+                {showReflection && (
+                  <div className="mb-3 p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-sm text-purple-300">
+                    {t('consensusQuestion')}
+                  </div>
+                )}
+
+                {votingTransactions.length === 0 ? (
+                  <p className="text-sm text-muted text-center py-4">{t('noPendingVotations')}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {votingTransactions.map((tx) => {
+                      const senderBalance = (() => {
+                        const s = allParticipants.find(p => p.id === tx.senderId);
+                        return s ? getBalance(s) : 0;
+                      })();
+                      const pending = totalVoters - tx.votesFor - tx.votesAgainst;
+                      const hasVoted = tx.voterIds?.includes(teacherParticipant?.id ?? '') || false;
+
+                      return (
+                        <div key={tx.id} className="p-2 bg-surface-alt rounded-lg text-sm">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-body font-medium">
+                              {tx.sender?.name} → {tx.receiver?.name}: {tx.amount}
+                            </span>
+                            <span className="text-muted">({t('availableBalance')}: {senderBalance})</span>
+
+                            <span className="flex items-center gap-0.5 text-green-500">
+                              <CheckCircle className="w-3.5 h-3.5" />{tx.votesFor}
+                            </span>
+                            <span className="flex items-center gap-0.5 text-red-500">
+                              <XCircle className="w-3.5 h-3.5" />{tx.votesAgainst}
+                            </span>
+                            <span className="flex items-center gap-0.5 text-amber-500">
+                              <Clock className="w-3.5 h-3.5" />{pending}
+                            </span>
+                          </div>
+
+                          <div className="flex gap-1.5 mt-2 flex-wrap items-center">
+                            {/* Normal vote buttons */}
+                            <button
+                              onClick={() => onVote && onVote(tx.id, 'for')}
+                              disabled={hasVoted}
+                              className="p-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-500 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => onVote && onVote(tx.id, 'against')}
+                              disabled={hasVoted}
+                              className="p-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-500 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                            {hasVoted && (
+                              <span className="text-xs text-muted">{t('voted')}</span>
+                            )}
+                            {/* Force buttons (teacher-only) */}
+                            <button
+                              onClick={() => onForceTransaction && onForceTransaction(tx.id, 'accept')}
+                              disabled={processingTx === tx.id}
+                              className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors flex items-center gap-1 ml-auto"
+                            >
+                              <CheckCircle className="w-3 h-3" /> {t('forceAccept')}
+                            </button>
+                            <button
+                              onClick={() => onForceTransaction && onForceTransaction(tx.id, 'reject')}
+                              disabled={processingTx === tx.id}
+                              className="px-2 py-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded text-xs font-medium transition-colors flex items-center gap-1"
+                            >
+                              <XCircle className="w-3 h-3" /> {t('forceReject')}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="flex flex-col gap-4">
+              {/* Accepted Transactions */}
+              <div className="zone-card bg-surface flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <h3 className="font-semibold text-heading">{t('acceptedTransactions')}</h3>
+                </div>
+
+                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                  {approvedTransactions.length === 0 ? (
+                    <p className="text-sm text-muted text-center py-4">{t('noTransactionsYet')}</p>
+                  ) : (
+                    approvedTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center gap-2 p-1.5 text-sm">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                        <span className="text-body">
+                          {tx.sender?.name} → {tx.receiver?.name}: {tx.amount}
+                        </span>
+                        <span className="text-muted text-xs ml-auto">
+                          (✓{tx.votesFor} ✗{tx.votesAgainst})
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Rejected Transactions */}
+              <div className="zone-card bg-surface flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <XCircle className="w-5 h-5 text-red-500" />
+                  <h3 className="font-semibold text-heading">{t('rejectedTransactions')}</h3>
+                </div>
+
+                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                  {rejectedTransactions.length === 0 ? (
+                    <p className="text-sm text-muted text-center py-4">{t('noTransactionsYet')}</p>
+                  ) : (
+                    rejectedTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center gap-2 p-1.5 text-sm">
+                        <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                        <span className="text-body">
+                          {tx.sender?.name} → {tx.receiver?.name}: {tx.amount}
+                        </span>
+                        <span className="text-muted text-xs ml-auto">
+                          (✓{tx.votesFor} ✗{tx.votesAgainst})
+                        </span>
+                        {tx.rejectReason && (
+                          <span className="text-xs text-red-400">
+                            — {tx.rejectReason}
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
-          )}
-
-          {!votingTransaction && (
-            <p className="text-center text-muted py-4 bg-surface rounded-lg">
-              {t('noProposalsYet')}
-            </p>
-          )}
-
-          {/* Voting Participation Stats */}
-          {proposedTransactions.length > 0 && (
-            <div className="mt-4">
-              <h3 className="font-medium text-body mb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-purple-500" />
-                {t('votingParticipation')}
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {students.map((student) => {
-                  const participation = getVotingParticipation(student.id);
-                  const percentage = participation.total > 0 
-                    ? Math.round((participation.voted / participation.total) * 100) 
-                    : 0;
-                  return (
-                    <div key={student.id} className="p-2 bg-surface rounded-lg">
-                      <p className="text-sm font-medium text-body truncate">{student.name}</p>
-                      <p className="text-xs text-muted">
-                        {participation.voted}/{participation.total} ({percentage}%)
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </motion.div>
-      )}
+          </div>
+        </div>
+        );
+      })()}
 
       {/* Phase 3 Digital Signatures Control Panel */}
       {currentPhase === 3 && (
@@ -1478,136 +1666,6 @@ export default function TeacherDashboard({
         </motion.div>
       )}
 
-      {currentPhase !== 1 && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Student Activity Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="zone-card"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <GraduationCap className="w-5 h-5 text-amber-500" />
-            <h2 className="font-semibold text-heading">{t('studentActivity')}</h2>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-default">
-                  <th className="text-left py-2 px-2 font-medium text-secondary">Nom</th>
-                  <th className="text-center py-2 px-2 font-medium text-secondary">TX</th>
-                  <th className="text-center py-2 px-2 font-medium text-secondary">Enviat</th>
-                  <th className="text-center py-2 px-2 font-medium text-secondary">Rebut</th>
-                  <th className="text-center py-2 px-2 font-medium text-secondary">Saldo</th>
-                  <th className="text-center py-2 px-2 font-medium text-secondary">Sospitós?</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((student) => {
-                  const stats = getStudentStats(student);
-                  return (
-                    <tr key={student.id} className="border-b border-subtle hover:bg-surface-alt">
-                      <td className="py-2 px-2 font-medium text-heading">{student.name}</td>
-                      <td className="py-2 px-2 text-center text-secondary">{stats.transactionCount}</td>
-                      <td className="py-2 px-2 text-center text-secondary">{stats.totalSent}</td>
-                      <td className="py-2 px-2 text-center text-secondary">{stats.totalReceived}</td>
-                      <td className={`py-2 px-2 text-center font-medium ${
-                        stats.claimedBalance < 0 ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {stats.claimedBalance}
-                      </td>
-                      <td className="py-2 px-2 text-center">
-                        {stats.discrepancy ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-xs">
-                            <AlertTriangle className="w-3 h-3" />
-                            Sí
-                          </span>
-                        ) : stats.hasOverspent ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full text-xs" title="Ha enviat més del saldo disponible">
-                            <HelpCircle className="w-3 h-3" />
-                            ?
-                          </span>
-                        ) : (
-                          <span className="text-green-500">✔</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {students.length === 0 && (
-            <p className="text-center text-muted py-4">No hi ha estudiants encara</p>
-          )}
-        </motion.div>
-
-        {/* Transaction Registry */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="zone-card"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Eye className="w-5 h-5 text-violet-500" />
-            <h2 className="font-semibold text-heading">{t('transactionRegistry')}</h2>
-          </div>
-
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {transactions.length === 0 ? (
-              <p className="text-center text-muted py-4">No hi ha transaccions encara</p>
-            ) : (
-              transactions.map((tx) => {
-                const isSuspicious = isTransactionSuspicious(tx);
-                return (
-                  <motion.div
-                    key={tx.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className={`p-3 rounded-lg flex items-center justify-between ${
-                      tx.isHighlighted
-                        ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-400 dark:border-amber-500/50'
-                        : isSuspicious
-                        ? 'bg-red-50 dark:bg-red-500/10 border-l-4 border-red-400 dark:border-red-500'
-                        : 'bg-surface-alt'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-body">{tx.sender?.name}</span>
-                      <span className="text-faint">→</span>
-                      <span className="font-medium text-body">{tx.receiver?.name}</span>
-                      <span className="text-amber-600 dark:text-amber-400 font-semibold">{tx.amount} <i className="fa-solid fa-cent-sign" /></span>
-                      {isSuspicious && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full text-xs">
-                          <AlertTriangle className="w-3 h-3" />
-                          Saldo insuficient
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      onClick={() => onHighlightTransaction(tx.id, !tx.isHighlighted)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        tx.isHighlighted
-                          ? 'bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-400'
-                          : 'hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-400 dark:text-zinc-500'
-                      }`}
-                      title={t('highlightTransaction')}
-                    >
-                      <Star className={`w-4 h-4 ${tx.isHighlighted ? 'fill-current' : ''}`} />
-                    </button>
-                  </motion.div>
-                );
-              })
-            )}
-          </div>
-        </motion.div>
-      </div>
-      )}
 
     </div>
   );

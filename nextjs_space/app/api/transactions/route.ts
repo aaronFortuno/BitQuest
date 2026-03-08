@@ -37,29 +37,38 @@ export async function POST(req: NextRequest) {
     }
 
     // Phase 2: Create voting transaction (distributed consensus)
+    // Multiple proposals allowed simultaneously; proposer auto-votes in favor
     if (phase === 2) {
-      const existingVoting = store.getTransactionsByRoom(roomId)
-        .find(tx => tx.status === 'voting');
-
-      if (existingVoting) {
-        return NextResponse.json(
-          { error: 'There is already a proposal being voted on' },
-          { status: 400 }
-        );
-      }
-
+      const proposer = proposedById || senderId;
       const transaction = store.createTransaction(roomId, {
         senderId,
         receiverId,
         amount: parsedAmount,
         status: 'voting',
-        proposedById: proposedById || senderId,
-        votesFor: 0,
+        proposedById: proposer,
+        votesFor: 1,
         votesAgainst: 0,
-        voterIds: [],
+        voterIds: [proposer],
         isHighlighted: false,
         isFlagged: false,
       });
+
+      // Check if auto-vote already reaches majority (edge case: 1 active student)
+      const state = store.getRoomById(roomId);
+      const activeVoters = state
+        ? Array.from(state.participants.values()).filter(p => p.isActive)
+        : [];
+      const majorityNeeded = Math.floor(activeVoters.length / 2) + 1;
+
+      if (transaction.votesFor >= majorityNeeded) {
+        store.updateTransaction(transaction.id, { status: 'approved' });
+        store.updateParticipant(senderId, {
+          coinFile: updateCoinFileBalance(sender.coinFile, -parsedAmount),
+        });
+        store.updateParticipant(receiverId, {
+          coinFile: updateCoinFileBalance(receiver.coinFile, parsedAmount),
+        });
+      }
 
       const roomCode = store.getRoomCodeById(roomId);
       if (roomCode) broadcastRoomUpdate(roomCode);

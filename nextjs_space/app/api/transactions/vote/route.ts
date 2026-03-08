@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
 
     // Calculate if majority reached
     const state = store.getRoomById(transaction.roomId);
-    const activeStudents = state
-      ? Array.from(state.participants.values()).filter(p => p.role === 'student' && p.isActive)
+    const activeVoters = state
+      ? Array.from(state.participants.values()).filter(p => p.isActive)
       : [];
-    const totalVoters = activeStudents.length;
+    const totalVoters = activeVoters.length;
     const majorityNeeded = Math.floor(totalVoters / 2) + 1;
 
     // Check if voting is complete

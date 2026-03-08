@@ -5,9 +5,51 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.1';
+const VERSION = 'v0.4.2';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.2',
+    date: '2026-03-08',
+    changes: {
+      ca: [
+        'Professor com a participant actiu a Fase 2: pot proposar transaccions (legítimes i fraudulentes)',
+        'Dashboard professor reestructurat: 4 panells idèntics a la interfície alumne (2 columnes 60/40)',
+        'Select de remitent inclou TOTS els participants per demostrar suplantació d\'identitat',
+        'Avís visual quan el professor proposa en nom d\'un altre (identitat falsa)',
+        'Botons de vot normal + forçar acceptació/rebuig al panell de votacions pendents',
+        'Alumnes veuen l\'admin als selectors de remitent/destinatari',
+        'Corregit: TX de l\'admin ja no s\'auto-aproven (majoria compta tots els participants)',
+        'Botó de reflexió (?) mogut a "Votacions pendents" (era a "Transaccions acceptades")',
+        'Eliminats panells redundants "Activitat dels estudiants" i "Registre de transaccions"',
+        'Layout 60/40 a les dues interfícies (professor i alumne) per optimitzar espai',
+      ],
+      es: [
+        'Profesor como participante activo en Fase 2: puede proponer transacciones (legítimas y fraudulentas)',
+        'Dashboard profesor reestructurado: 4 paneles idénticos a la interfaz alumno (2 columnas 60/40)',
+        'Select de remitente incluye TODOS los participantes para demostrar suplantación de identidad',
+        'Aviso visual cuando el profesor propone en nombre de otro (identidad falsa)',
+        'Botones de voto normal + forzar aceptación/rechazo en el panel de votaciones pendientes',
+        'Alumnos ven al admin en los selectores de remitente/destinatario',
+        'Corregido: TX del admin ya no se auto-aprueban (mayoría cuenta todos los participantes)',
+        'Botón de reflexión (?) movido a "Votaciones pendientes" (era en "Transacciones aceptadas")',
+        'Eliminados paneles redundantes "Actividad de los estudiantes" y "Registro de transacciones"',
+        'Layout 60/40 en ambas interfaces (profesor y alumno) para optimizar espacio',
+      ],
+      en: [
+        'Teacher as active participant in Phase 2: can propose transactions (legitimate and fraudulent)',
+        'Teacher dashboard restructured: 4 panels identical to student interface (2-column 60/40)',
+        'Sender select includes ALL participants to demonstrate identity spoofing',
+        'Visual warning when teacher proposes on behalf of another (false identity)',
+        'Normal vote buttons + force accept/reject in pending votations panel',
+        'Students can see the admin in sender/receiver selectors',
+        'Fixed: admin TX no longer auto-approved (majority counts all participants)',
+        'Reflection button (?) moved to "Pending votations" (was in "Accepted transactions")',
+        'Removed redundant "Student activity" and "Transaction registry" panels',
+        '60/40 layout on both interfaces (teacher and student) to optimize space',
+      ],
+    },
+  },
   {
     version: 'v0.4.1',
     date: '2026-03-08',

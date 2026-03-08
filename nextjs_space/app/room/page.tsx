@@ -392,6 +392,7 @@ export default function RoomPage() {
             onApproveTransaction={approveTransaction}
             onRejectTransaction={rejectTransaction}
             onForceTransaction={forceTransaction}
+            onVote={voteOnTransaction}
             onSendFakeMessage={sendFakeMessage}
             onToggleNodeDisconnection={toggleNodeDisconnection}
             onFillMempool={fillMempool}
@@ -412,6 +413,9 @@ export default function RoomPage() {
             onFillSimulationMempool={fillSimulationMempool}
             onAccelerateHalvings={accelerateHalvings}
             onUpdateParticipantBalance={updateParticipantCoinFile}
+            onProposeTransaction={async (senderId, receiverId, amount, proposedById) => {
+              await sendTransaction(receiverId, amount, 2, senderId, proposedById);
+            }}
           />
         ) : (
           renderStudentInterface()
