@@ -21,6 +21,9 @@ Thumbs.db
 # Claude Code
 .claude/
 
+# Server monitor logs
+server-monitor.log
+
 # Abacus
 .abacus.donotdelete
 .prompts-abacus/

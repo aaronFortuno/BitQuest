@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType } from '@/lib/types';
-import { joinRoom as socketJoinRoom, leaveRoom as socketLeaveRoom, onRoomUpdate } from '@/lib/socket';
+// TEMPORARILY DISABLED — Socket.io long-polling exhausts browser connection pool
+// import { joinRoom as socketJoinRoom, leaveRoom as socketLeaveRoom, onRoomUpdate } from '@/lib/socket';
 import { apiUrl } from '@/lib/api';
 import { generateRSAKeyPair, serializePublicKey } from '@/lib/crypto';
 
@@ -61,6 +62,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   const roomUuidRef = useRef<string | null>(null);
   // Guard against concurrent fetchRoom calls piling up
   const isFetchingRoom = useRef(false);
+  // Debounce timer for Socket.io-triggered fetches
+  const debouncedFetchTimer = useRef<NodeJS.Timeout | null>(null);
 
   const fetchRoom = useCallback(async () => {
     if (!roomId) return;
@@ -108,39 +111,44 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
 
     fetchRoom();
 
-    // Fallback polling every 2 seconds for responsive updates
-    pollInterval.current = setInterval(fetchRoom, 2000);
+    // Restart polling interval (called after Socket.io events to avoid overlap)
+    const startPolling = () => {
+      if (pollInterval.current) clearInterval(pollInterval.current);
+      pollInterval.current = setInterval(fetchRoom, 2000);
+    };
+    startPolling();
 
     // Refetch immediately when tab becomes visible (browsers throttle background intervals)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         fetchRoom();
+        startPolling(); // Reset interval after refetch
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
+    // Socket.io: TEMPORARILY DISABLED
+    // Socket.io long-polling was exhausting the browser's connection pool (~6 conns/origin),
+    // causing ALL fetch requests to hang after ~60s. HTTP polling works fine alone.
+    // TODO: Re-enable once Socket.io is configured to use WebSocket-only transport.
+    // let socketCleanup: (() => void) | null = null;
+    // if (room?.code) {
+    //   socketJoinRoom(room.code);
+    //   socketCleanup = onRoomUpdate(() => {
+    //     if (debouncedFetchTimer.current) clearTimeout(debouncedFetchTimer.current);
+    //     debouncedFetchTimer.current = setTimeout(() => {
+    //       fetchRoom();
+    //       startPolling();
+    //     }, 300);
+    //   });
+    // }
+
     return () => {
-      if (pollInterval.current) {
-        clearInterval(pollInterval.current);
-      }
+      if (pollInterval.current) clearInterval(pollInterval.current);
+      if (debouncedFetchTimer.current) clearTimeout(debouncedFetchTimer.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [roomId, enabled, fetchRoom]);
-
-  // Socket.io: listen for real-time room updates
-  useEffect(() => {
-    if (!enabled || !roomId || !room?.code) return;
-
-    socketJoinRoom(room.code);
-    const cleanup = onRoomUpdate(() => {
-      fetchRoom();
-    });
-
-    return () => {
-      cleanup();
-      socketLeaveRoom(room.code);
-    };
-  }, [roomId, room?.code, enabled, fetchRoom]);
 
   const sendTransaction = useCallback(async (receiverId: string, amount: number, phase: number = 0, senderId?: string, proposedById?: string) => {
     if (!room || !participantId) return null;
@@ -795,7 +803,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     const blocksPoll = setInterval(() => {
       fetchBlocks();
       fetchMempoolTransactions();
-    }, 2000); // Poll every 2s as fallback (Socket.io handles real-time)
+    }, 2000); // Uses base poll interval (Socket.io handles real-time)
 
     return () => clearInterval(blocksPoll);
   // eslint-disable-next-line react-hooks/exhaustive-deps

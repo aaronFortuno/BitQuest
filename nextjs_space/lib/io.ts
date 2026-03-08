@@ -1,4 +1,5 @@
 import type { Server as SocketIOServer } from 'socket.io';
+import { monitor } from './server-monitor';
 
 // Persist across HMR reloads
 const globalForIO = globalThis as unknown as {
@@ -20,6 +21,7 @@ export function getIO(): SocketIOServer | null {
 
 export function broadcastRoomUpdate(roomCode: string) {
   if (io) {
+    monitor.incrementBroadcasts();
     io.to(`room:${roomCode}`).emit('room:update');
   }
 }

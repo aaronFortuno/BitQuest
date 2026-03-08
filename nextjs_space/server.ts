@@ -2,6 +2,7 @@ import { createServer } from 'http';
 import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
 import { initIO } from './lib/io';
+import { monitor } from './lib/server-monitor';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -11,11 +12,30 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
+  // Start server monitor
+  monitor.start();
+
   const httpServer = createServer((req, res) => {
     // Skip Socket.io requests — they are handled by Socket.io's own middleware
     if (req.url?.startsWith('/api/socketio')) {
       return;
     }
+
+    // Monitor: track request timing
+    const url = req.url || '/';
+    const method = req.method || 'GET';
+    // Normalize route key: strip query params
+    const routePath = url.split('?')[0];
+    const routeKey = `${method} ${routePath}`;
+    const startTime = Date.now();
+    monitor.requestIn(routeKey);
+
+    const originalEnd = res.end;
+    res.end = function (...args: Parameters<typeof originalEnd>) {
+      monitor.requestOut(routeKey, Date.now() - startTime);
+      return originalEnd.apply(res, args);
+    } as typeof originalEnd;
+
     handle(req, res);
   });
 

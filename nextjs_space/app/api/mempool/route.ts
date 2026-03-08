@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
+import { monitor } from '@/lib/server-monitor';
 
 
 // Generate a human-readable mempool transaction ID
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
 
 // Simulate transaction propagation through the network
 async function simulatePropagation(txId: string, roomId: string) {
+  monitor.propagationStart();
   try {
     // Get all active, non-disconnected participants
     const participants = store.getParticipantsByRoom(roomId)
@@ -140,5 +142,7 @@ async function simulatePropagation(txId: string, roomId: string) {
     }
   } catch (error) {
     console.error('Error during propagation simulation:', error);
+  } finally {
+    monitor.propagationEnd();
   }
 }
