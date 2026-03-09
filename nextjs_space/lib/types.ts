@@ -62,6 +62,8 @@ export interface Room {
   halvingInterval: number;
   currentBlockReward: number;
   totalBtcEmitted: number;
+  // Phase 5: Network control
+  studentSendingEnabled?: boolean;
   // Phase 9: Free simulation
   activeChallenge?: string | null;
   challengeData?: string | null;

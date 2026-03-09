@@ -282,7 +282,7 @@ La UI renderitza amb les noves props.
 
 ## Estat de progres
 
-- [ ] Pas 1: Camp `studentSendingEnabled`
+- [x] Pas 1: Camp `studentSendingEnabled` (commit: veure git log)
 - [ ] Pas 2: Topologia de xarxa (2-3 connexions per node)
 - [ ] Pas 3: Propagacio per graf (BFS amb delays)
 - [ ] Pas 4: Interficie alumne (reescriptura)

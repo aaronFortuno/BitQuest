@@ -18,6 +18,7 @@ export interface RoomData {
   halvingInterval: number;
   currentBlockReward: number;
   totalBtcEmitted: number;
+  studentSendingEnabled: boolean;
   activeChallenge: string | null;
   challengeData: string | null;
   simulationStarted: boolean;
@@ -197,6 +198,7 @@ function createRoomState(code: string): RoomState {
       halvingInterval: 20,
       currentBlockReward: 50,
       totalBtcEmitted: 0,
+      studentSendingEnabled: false,
       activeChallenge: null,
       challengeData: null,
       simulationStarted: false,
