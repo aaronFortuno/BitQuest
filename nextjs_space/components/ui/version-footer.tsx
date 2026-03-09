@@ -5,9 +5,93 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.3';
+const VERSION = 'v0.4.5';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.5',
+    date: '2026-03-09',
+    changes: {
+      ca: [
+        'Fase 4 completa: Model UTXO amb validació local de transaccions',
+        'El professor controla l\'emissió de monedes: botons toggle per seleccionar alumnes i enviar BTC',
+        'Eliminat botó "Inicialitzar UTXOs" de l\'alumne — el professor envia monedes directament',
+        'Validació local de TX: cada alumne valida transaccions individualment, creant registres potencialment incoherents',
+        'Panell "Transaccions pendents de validar" amb botó Validar per cada TX',
+        'Panell "Transaccions verificades" amb numeració d\'ordre local (#1, #2...) i border verd',
+        'Persistència de validacions en localStorage per cada participant',
+        'Layout alumne reorganitzat: 2 columnes (cartera + constructor | pendents + verificades)',
+        'Layout professor reorganitzat: 2 columnes (enviar BTC + pendents | verificades)',
+        'Colors neutres al dashboard del professor (eliminat accent taronja)',
+        'Eliminats quadres d\'estadístiques redundants del dashboard professor',
+      ],
+      es: [
+        'Fase 4 completa: Modelo UTXO con validación local de transacciones',
+        'El profesor controla la emisión de monedas: botones toggle para seleccionar alumnos y enviar BTC',
+        'Eliminado botón "Inicializar UTXOs" del alumno — el profesor envía monedas directamente',
+        'Validación local de TX: cada alumno valida transacciones individualmente, creando registros potencialmente incoherentes',
+        'Panel "Transacciones pendientes de validar" con botón Validar por cada TX',
+        'Panel "Transacciones verificadas" con numeración de orden local (#1, #2...) y borde verde',
+        'Persistencia de validaciones en localStorage por cada participante',
+        'Layout alumno reorganizado: 2 columnas (cartera + constructor | pendientes + verificadas)',
+        'Layout profesor reorganizado: 2 columnas (enviar BTC + pendientes | verificadas)',
+        'Colores neutros en el dashboard del profesor (eliminado acento naranja)',
+        'Eliminados cuadros de estadísticas redundantes del dashboard profesor',
+      ],
+      en: [
+        'Phase 4 complete: UTXO model with local transaction validation',
+        'Teacher controls coin emission: toggle buttons to select students and send BTC',
+        'Removed "Initialize UTXOs" button from student — teacher sends coins directly',
+        'Local TX validation: each student validates transactions individually, creating potentially inconsistent records',
+        'Pending transactions panel with Validate button per TX',
+        'Verified transactions panel with local order numbering (#1, #2...) and green border',
+        'Validation persistence in localStorage per participant',
+        'Student layout reorganized: 2 columns (wallet + builder | pending + verified)',
+        'Teacher layout reorganized: 2 columns (send BTC + pending | verified)',
+        'Neutral colors on teacher dashboard (removed orange accent)',
+        'Removed redundant statistics boxes from teacher dashboard',
+      ],
+    },
+  },
+  {
+    version: 'v0.4.4',
+    date: '2026-03-09',
+    changes: {
+      ca: [
+        'Reestructuració UX completa de Fase 3: interfícies professor i alumne redissenyades',
+        'Colors neutres (eliminat tema lila) i layout compacte per a totes les zones',
+        'Helper pas a pas: generació de parells de claus RSA amb explicació de cada operació',
+        'Helper pas a pas: procés de hash d\'un missatge (estat inicial, XOR per caràcter, resultat)',
+        'Helper pas a pas: signatura digital (hash → mod n → exponenciació amb clau privada)',
+        'Helper pas a pas: verificació de signatures (exponenciació amb clau pública → comparació de hash)',
+        'Tooltips d\'ajuda contextuals als passos de hash, signatura i verificació',
+        'Nom del participant visible a la capçalera del perfil',
+        'Monitor de servidor desactivat per evitar congelades',
+      ],
+      es: [
+        'Reestructuración UX completa de Fase 3: interfaces profesor y alumno rediseñadas',
+        'Colores neutros (eliminado tema lila) y layout compacto para todas las zonas',
+        'Helper paso a paso: generación de pares de claves RSA con explicación de cada operación',
+        'Helper paso a paso: proceso de hash de un mensaje (estado inicial, XOR por carácter, resultado)',
+        'Helper paso a paso: firma digital (hash → mod n → exponenciación con clave privada)',
+        'Helper paso a paso: verificación de firmas (exponenciación con clave pública → comparación de hash)',
+        'Tooltips de ayuda contextuales en los pasos de hash, firma y verificación',
+        'Nombre del participante visible en la cabecera del perfil',
+        'Monitor de servidor desactivado para evitar congelaciones',
+      ],
+      en: [
+        'Full UX restructure of Phase 3: teacher and student interfaces redesigned',
+        'Neutral colors (removed purple theme) and compact layout for all zones',
+        'Step-by-step helper: RSA key pair generation with explanation of each operation',
+        'Step-by-step helper: message hashing process (initial state, XOR per character, result)',
+        'Step-by-step helper: digital signature (hash → mod n → exponentiation with private key)',
+        'Step-by-step helper: signature verification (exponentiation with public key → hash comparison)',
+        'Contextual help tooltips on hash, signature and verification steps',
+        'Participant name visible in profile header',
+        'Server monitor disabled to prevent freezes',
+      ],
+    },
+  },
   {
     version: 'v0.4.3',
     date: '2026-03-08',

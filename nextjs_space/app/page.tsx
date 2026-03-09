@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Coins, Users, GraduationCap, ArrowRight, HelpCircle } from 'lucide-react';
+import { Coins, Users, GraduationCap, ArrowRight, HelpCircle, Clock } from 'lucide-react';
 import { formatRoomCode, validateRoomCode } from '@/lib/room-utils';
 import { apiUrl } from '@/lib/api';
 import HelpModal from '@/components/ui/help-modal';
@@ -222,6 +222,11 @@ export default function LandingPage() {
                   {loading ? t('loading') : t('create')}
                 </button>
               </div>
+
+              <p className="text-xs text-gray-400 dark:text-zinc-500 mt-3 flex items-start gap-1.5">
+                <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                {t('serverWakeWarning')}
+              </p>
             </motion.div>
           )}
 

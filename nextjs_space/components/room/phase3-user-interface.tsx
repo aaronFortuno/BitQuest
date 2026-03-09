@@ -303,7 +303,7 @@ export default function Phase3UserInterface({
   const anatomyMessage = anatomyMessageId ? messages.find(m => m.id === anatomyMessageId) : null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Feedback */}
       <AnimatePresence>
         {feedback && (

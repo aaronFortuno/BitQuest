@@ -16,6 +16,7 @@ import Phase1UserInterface from '@/components/room/phase1-user-interface';
 import Phase2UserInterface from '@/components/room/phase2-user-interface';
 import Phase3UserInterface from '@/components/room/phase3-user-interface';
 import Phase3CryptoPanel from '@/components/room/phase3-crypto-panel';
+import Phase4UtxoPanel from '@/components/room/phase4-utxo-panel';
 import Phase4UserInterface from '@/components/room/phase4-user-interface';
 import Phase5UserInterface from '@/components/room/phase5-user-interface';
 import { Phase6UserInterface } from '@/components/room/phase6-user-interface';
@@ -90,6 +91,7 @@ export default function RoomPage() {
     broadcastPublicKey,
     sendSignedMessage,
     initializeUtxos,
+    teacherSendUtxo,
     sendUtxoTransaction,
     // Phase 5
     initializeNetwork,
@@ -254,14 +256,22 @@ export default function RoomPage() {
 
     if (viewPhase === 4) {
       return (
-        <Phase4UserInterface
-          room={room}
-          participant={currentParticipant!}
-          utxos={utxos}
-          utxoTransactions={utxoTransactions}
-          onInitializeUtxos={initializeUtxos}
-          onSendTransaction={sendUtxoTransaction}
-        />
+        <div className="space-y-6">
+          <Phase4UtxoPanel
+            participant={currentParticipant!}
+            room={room}
+            utxos={utxos}
+            utxoTransactions={utxoTransactions}
+            defaultCollapsed={true}
+          />
+          <Phase4UserInterface
+            room={room}
+            participant={currentParticipant!}
+            utxos={utxos}
+            utxoTransactions={utxoTransactions}
+            onSendTransaction={sendUtxoTransaction}
+          />
+        </div>
       );
     }
 
@@ -445,6 +455,7 @@ export default function RoomPage() {
             onFillSimulationMempool={fillSimulationMempool}
             onAccelerateHalvings={accelerateHalvings}
             onUpdateParticipantBalance={updateParticipantCoinFile}
+            onTeacherSendUtxo={teacherSendUtxo}
             onProposeTransaction={async (senderId, receiverId, amount, proposedById) => {
               await sendTransaction(receiverId, amount, 2, senderId, proposedById);
             }}

@@ -571,6 +571,36 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, participantId, fetchUtxos]);
 
+  // Phase 4: Teacher sends BTC to a student (mint)
+  const teacherSendUtxo = useCallback(async (
+    targetParticipantId: string,
+    amount: number
+  ): Promise<UTXO[] | null> => {
+    if (!room) return null;
+
+    try {
+      const res = await fetch(apiUrl('/api/utxos'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: room.id,
+          participantId: targetParticipantId,
+          teacherMint: true,
+          amount,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to send UTXOs');
+      const data = await res.json();
+
+      await fetchUtxos();
+      return data as UTXO[];
+    } catch (err) {
+      console.error('Teacher send UTXO error:', err);
+      return null;
+    }
+  }, [room, fetchUtxos]);
+
   // Phase 4: Send a UTXO transaction
   const sendUtxoTransaction = useCallback(async (
     inputUtxoIds: string[],
@@ -1481,6 +1511,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     sendFakeMessage,
     // Phase 4
     initializeUtxos,
+    teacherSendUtxo,
     sendUtxoTransaction,
     // Phase 5
     initializeNetwork,

@@ -32,20 +32,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Initialize UTXOs for a participant (3 UTXOs with values 10, 5, 2)
+// POST: Initialize UTXOs for a participant
+// Supports teacherMint mode: { teacherMint: true, amount: N } creates a single UTXO
+// Default mode: creates 3 UTXOs with values 10, 5, 2
 export async function POST(request: NextRequest) {
   try {
-    const { roomId, participantId } = await request.json();
+    const { roomId, participantId, teacherMint, amount } = await request.json();
 
     if (!roomId || !participantId) {
       return NextResponse.json({ error: 'roomId and participantId are required' }, { status: 400 });
-    }
-
-    // Check if participant already has UTXOs
-    const existingUtxos = store.getUTXOsByOwner(roomId, participantId);
-
-    if (existingUtxos.length > 0) {
-      return NextResponse.json({ message: 'Participant already has UTXOs', utxos: existingUtxos });
     }
 
     // Get participant info for UTXO ID generation
@@ -55,15 +50,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
     }
 
+    if (teacherMint) {
+      // Teacher mint: create a single UTXO with specified amount
+      if (!amount || amount <= 0) {
+        return NextResponse.json({ error: 'amount must be positive' }, { status: 400 });
+      }
+      // Use total UTXO count (including spent) to avoid ID collisions
+      const allUtxos = store.getUTXOsByOwner(roomId, participantId);
+      const nextIndex = allUtxos.length + 1;
+      const utxo = store.createUTXO(roomId, {
+        utxoId: generateUtxoId(participant.name, nextIndex),
+        ownerId: participantId,
+        amount,
+        isSpent: false,
+      });
+      const roomCode = store.getRoomCodeById(roomId);
+      if (roomCode) broadcastRoomUpdate(roomCode);
+      return NextResponse.json([{ ...utxo, owner: participant }]);
+    }
+
+    // Default mode: check if participant already has UTXOs
+    const existingUtxos = store.getUTXOsByOwner(roomId, participantId);
+
+    if (existingUtxos.length > 0) {
+      return NextResponse.json({ message: 'Participant already has UTXOs', utxos: existingUtxos });
+    }
+
     const baseIndex = 1;
 
     // Create 3 initial UTXOs with values 10, 5, 2
     const initialValues = [10, 5, 2];
-    const utxos = initialValues.map((amount, idx) => {
+    const utxos = initialValues.map((amt, idx) => {
       const utxo = store.createUTXO(roomId, {
         utxoId: generateUtxoId(participant.name, baseIndex + idx),
         ownerId: participantId,
-        amount,
+        amount: amt,
         isSpent: false,
       });
       return { ...utxo, owner: participant };
