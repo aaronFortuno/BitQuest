@@ -26,27 +26,13 @@ interface Phase5UserInterfaceProps {
 
 // ─── Helpers ───
 
-// Floating animation for nodes: each node gently drifts in a small loop
-function useFloatingOffset(seed: number) {
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  useEffect(() => {
-    let frame: number;
-    const speed = 0.0004 + (seed % 7) * 0.00005;
-    const radiusX = 3 + (seed % 5);
-    const radiusY = 2 + (seed % 4);
-    const phaseX = seed * 1.3;
-    const phaseY = seed * 0.7;
-    const animate = (t: number) => {
-      setOffset({
-        x: Math.sin(t * speed + phaseX) * radiusX,
-        y: Math.cos(t * speed * 0.8 + phaseY) * radiusY,
-      });
-      frame = requestAnimationFrame(animate);
-    };
-    frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
-  }, [seed]);
-  return offset;
+// Generate SVG floating animation params from a seed (no hooks needed)
+function floatParams(seed: number) {
+  const durX = 4 + (seed % 3);
+  const durY = 5 + (seed % 4);
+  const ampX = 3 + (seed % 3);
+  const ampY = 2 + (seed % 3);
+  return { durX, ampX, ampY, values: `0,0; ${ampX},${-ampY}; ${-ampX},${ampY}; 0,0`, dur: `${durX + durY * 0.3}s` };
 }
 
 // ─── Mini node graph: shows only this student's node + their 2-3 peers ───
@@ -62,10 +48,11 @@ function MiniNodeGraph({
   nodeConnections: NodeConnection[];
   propagatingEdges: Set<string>;
 }) {
-  // Center position for "me"
   const cx = 160;
   const cy = 100;
   const radius = 80;
+
+  const connKey = (a: string, b: string) => [a, b].sort().join('-');
 
   // Position neighbors around the center
   const neighborPositions = useMemo(() => {
@@ -77,27 +64,19 @@ function MiniNodeGraph({
         x: cx + radius * Math.cos(angle),
         y: cy + radius * Math.sin(angle),
         disconnected: n.isNodeDisconnected || false,
+        float: floatParams(n.id.charCodeAt(0) + i * 13),
       };
     });
   }, [myNeighbors]);
 
-  // Floating offsets
-  const myFloat = useFloatingOffset(participant.id.charCodeAt(0));
-  const neighborFloats = myNeighbors.map((n, i) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useFloatingOffset(n.id.charCodeAt(0) + i * 13)
-  );
+  const myFloat = floatParams(participant.id.charCodeAt(0));
 
-  // Build connection key helper
-  const connKey = (a: string, b: string) => [a, b].sort().join('-');
-
-  // Find which connections relate to me
+  // My connections
   const myConnectionIds = useMemo(() => {
     const myId = participant.id;
     return nodeConnections
       .filter(c => c.isActive && (c.nodeAId === myId || c.nodeBId === myId))
       .map(c => ({
-        connId: c.id,
         peerId: c.nodeAId === myId ? c.nodeBId : c.nodeAId,
         key: connKey(c.nodeAId, c.nodeBId),
       }));
@@ -105,33 +84,24 @@ function MiniNodeGraph({
 
   return (
     <svg viewBox="0 0 320 200" className="w-full h-full">
-      {/* Connection lines */}
+      {/* Connection lines (static — animation is on nodes, lines connect centers) */}
       {myConnectionIds.map(({ peerId, key }) => {
         const nPos = neighborPositions.find(n => n.id === peerId);
         if (!nPos) return null;
-        const nIdx = myNeighbors.findIndex(n => n.id === peerId);
-        const nFloat = neighborFloats[nIdx] || { x: 0, y: 0 };
-
         const isPropagating = propagatingEdges.has(key);
         return (
           <g key={key}>
-            {/* Base line */}
             <line
-              x1={cx + myFloat.x}
-              y1={cy + myFloat.y}
-              x2={nPos.x + nFloat.x}
-              y2={nPos.y + nFloat.y}
+              x1={cx} y1={cy}
+              x2={nPos.x} y2={nPos.y}
               stroke={isPropagating ? '#facc15' : 'rgba(99, 130, 206, 0.4)'}
               strokeWidth={isPropagating ? 3 : 2}
               strokeLinecap="round"
             />
-            {/* Propagation glow */}
             {isPropagating && (
               <line
-                x1={cx + myFloat.x}
-                y1={cy + myFloat.y}
-                x2={nPos.x + nFloat.x}
-                y2={nPos.y + nFloat.y}
+                x1={cx} y1={cy}
+                x2={nPos.x} y2={nPos.y}
                 stroke="#facc15"
                 strokeWidth={6}
                 strokeLinecap="round"
@@ -149,65 +119,77 @@ function MiniNodeGraph({
         );
       })}
 
-      {/* Neighbor nodes */}
-      {neighborPositions.map((nPos, idx) => {
-        const nFloat = neighborFloats[idx] || { x: 0, y: 0 };
-        return (
-          <g key={nPos.id}>
-            <circle
-              cx={nPos.x + nFloat.x}
-              cy={nPos.y + nFloat.y}
-              r={22}
-              fill={nPos.disconnected ? '#991b1b' : '#1e3a5f'}
-              stroke={nPos.disconnected ? '#ef4444' : '#3b82f6'}
-              strokeWidth={2}
-              opacity={nPos.disconnected ? 0.5 : 1}
-            />
-            <text
-              x={nPos.x + nFloat.x}
-              y={nPos.y + nFloat.y + 1}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill="white"
-              fontSize="10"
-              fontWeight="500"
-            >
-              {nPos.name.length > 7 ? nPos.name.slice(0, 6) + '..' : nPos.name}
-            </text>
-          </g>
-        );
-      })}
+      {/* Neighbor nodes — each with its own floating animation */}
+      {neighborPositions.map((nPos) => (
+        <g key={nPos.id}>
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values={nPos.float.values}
+            dur={nPos.float.dur}
+            repeatCount="indefinite"
+            additive="sum"
+          />
+          <circle
+            cx={nPos.x}
+            cy={nPos.y}
+            r={22}
+            fill={nPos.disconnected ? '#991b1b' : '#1e3a5f'}
+            stroke={nPos.disconnected ? '#ef4444' : '#3b82f6'}
+            strokeWidth={2}
+            opacity={nPos.disconnected ? 0.5 : 1}
+          />
+          <text
+            x={nPos.x}
+            y={nPos.y + 1}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="white"
+            fontSize="10"
+            fontWeight="500"
+          >
+            {nPos.name.length > 7 ? nPos.name.slice(0, 6) + '..' : nPos.name}
+          </text>
+        </g>
+      ))}
 
-      {/* My node (center, bigger, highlighted) */}
-      <circle
-        cx={cx + myFloat.x}
-        cy={cy + myFloat.y}
-        r={28}
-        fill="#065f46"
-        stroke="#34d399"
-        strokeWidth={3}
-      />
-      <text
-        x={cx + myFloat.x}
-        y={cy + myFloat.y - 5}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill="#6ee7b7"
-        fontSize="10"
-        fontWeight="bold"
-      >
-        {participant.name.length > 8 ? participant.name.slice(0, 7) + '..' : participant.name}
-      </text>
-      <text
-        x={cx + myFloat.x}
-        y={cy + myFloat.y + 8}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill="#a7f3d0"
-        fontSize="8"
-      >
-        (tu)
-      </text>
+      {/* My node (center, bigger, highlighted) — with floating */}
+      <g>
+        <animateTransform
+          attributeName="transform"
+          type="translate"
+          values={myFloat.values}
+          dur={myFloat.dur}
+          repeatCount="indefinite"
+          additive="sum"
+        />
+        <circle
+          cx={cx} cy={cy}
+          r={28}
+          fill="#065f46"
+          stroke="#34d399"
+          strokeWidth={3}
+        />
+        <text
+          x={cx} y={cy - 5}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#6ee7b7"
+          fontSize="10"
+          fontWeight="bold"
+        >
+          {participant.name.length > 8 ? participant.name.slice(0, 7) + '..' : participant.name}
+        </text>
+        <text
+          x={cx} y={cy + 8}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#a7f3d0"
+          fontSize="8"
+        >
+          (tu)
+        </text>
+      </g>
     </svg>
   );
 }
