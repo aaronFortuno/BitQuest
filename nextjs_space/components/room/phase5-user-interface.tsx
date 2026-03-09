@@ -27,6 +27,8 @@ interface Phase5UserInterfaceProps {
 // ─── Constants ───
 const PULSE_DUR_S = 1.2;
 const FLASH_DUR_S = 0.5;
+const MINI_CX = 160, MINI_CY = 100, MINI_RADIUS = 80;
+const MINI_NODE_R = 22, MY_NODE_R = 28;
 
 // ─── Helpers ───
 
@@ -45,19 +47,15 @@ function MiniNodeGraph({
   participant,
   myNeighbors,
   nodeConnections,
-  pulses,
-  flashes,
+  renderedPulses,
+  renderedFlashes,
 }: {
   participant: Participant;
   myNeighbors: Participant[];
   nodeConnections: NodeConnection[];
-  pulses: { id: string; fromId: string; toId: string }[];
-  flashes: { nodeId: string; time: number }[];
+  renderedPulses: { id: string; x: number; y: number; opacity: number; r: number }[];
+  renderedFlashes: { id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number }[];
 }) {
-  const cx = 160;
-  const cy = 100;
-  const radius = 80;
-
   const connKey = (a: string, b: string) => [a, b].sort().join('-');
 
   // Position neighbors around the center
@@ -67,8 +65,8 @@ function MiniNodeGraph({
       return {
         id: n.id,
         name: n.name,
-        x: cx + radius * Math.cos(angle),
-        y: cy + radius * Math.sin(angle),
+        x: MINI_CX + MINI_RADIUS * Math.cos(angle),
+        y: MINI_CY + MINI_RADIUS * Math.sin(angle),
         disconnected: n.isNodeDisconnected || false,
         float: floatParams(n.id.charCodeAt(0) + i * 13),
       };
@@ -99,142 +97,68 @@ function MiniNodeGraph({
           </feMerge>
         </filter>
       </defs>
-      {/* Connection lines (static — animation is on nodes, lines connect centers) */}
+
+      {/* Connection lines */}
       {myConnectionIds.map(({ peerId, key }) => {
         const nPos = neighborPositions.find(n => n.id === peerId);
         if (!nPos) return null;
         return (
-          <g key={key}>
-            <line
-              x1={cx} y1={cy}
-              x2={nPos.x} y2={nPos.y}
-              stroke="rgba(99, 130, 206, 0.4)"
-              strokeWidth={2}
-              strokeLinecap="round"
-            />
-          </g>
+          <line key={key}
+            x1={MINI_CX} y1={MINI_CY} x2={nPos.x} y2={nPos.y}
+            stroke="rgba(99, 130, 206, 0.4)" strokeWidth={2} strokeLinecap="round"
+          />
         );
       })}
 
-      {/* Neighbor nodes — each with its own floating animation */}
+      {/* Neighbor nodes */}
       {neighborPositions.map((nPos) => (
         <g key={nPos.id}>
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values={nPos.float.values}
-            dur={nPos.float.dur}
-            repeatCount="indefinite"
-            additive="sum"
-          />
-          <circle
-            cx={nPos.x}
-            cy={nPos.y}
-            r={22}
+          <animateTransform attributeName="transform" type="translate"
+            values={nPos.float.values} dur={nPos.float.dur}
+            repeatCount="indefinite" additive="sum" />
+          <circle cx={nPos.x} cy={nPos.y} r={MINI_NODE_R}
             fill={nPos.disconnected ? '#991b1b' : '#1e3a5f'}
             stroke={nPos.disconnected ? '#ef4444' : '#3b82f6'}
-            strokeWidth={2}
-            opacity={nPos.disconnected ? 0.5 : 1}
-          />
-          <text
-            x={nPos.x}
-            y={nPos.y + 1}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="white"
-            fontSize="10"
-            fontWeight="500"
-          >
+            strokeWidth={2} opacity={nPos.disconnected ? 0.5 : 1} />
+          <text x={nPos.x} y={nPos.y + 1} textAnchor="middle"
+            dominantBaseline="middle" fill="white" fontSize="10" fontWeight="500">
             {nPos.name.length > 7 ? nPos.name.slice(0, 6) + '..' : nPos.name}
           </text>
         </g>
       ))}
 
-      {/* My node (center, bigger, highlighted) — with floating */}
+      {/* My node (center) */}
       <g>
-        <animateTransform
-          attributeName="transform"
-          type="translate"
-          values={myFloat.values}
-          dur={myFloat.dur}
-          repeatCount="indefinite"
-          additive="sum"
-        />
-        <circle
-          cx={cx} cy={cy}
-          r={28}
-          fill="#065f46"
-          stroke="#34d399"
-          strokeWidth={3}
-        />
-        <text
-          x={cx} y={cy - 5}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#6ee7b7"
-          fontSize="10"
-          fontWeight="bold"
-        >
+        <animateTransform attributeName="transform" type="translate"
+          values={myFloat.values} dur={myFloat.dur}
+          repeatCount="indefinite" additive="sum" />
+        <circle cx={MINI_CX} cy={MINI_CY} r={MY_NODE_R}
+          fill="#065f46" stroke="#34d399" strokeWidth={3} />
+        <text x={MINI_CX} y={MINI_CY - 5} textAnchor="middle"
+          dominantBaseline="middle" fill="#6ee7b7" fontSize="10" fontWeight="bold">
           {participant.name.length > 8 ? participant.name.slice(0, 7) + '..' : participant.name}
         </text>
-        <text
-          x={cx} y={cy + 8}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#a7f3d0"
-          fontSize="8"
-        >
+        <text x={MINI_CX} y={MINI_CY + 8} textAnchor="middle"
+          dominantBaseline="middle" fill="#a7f3d0" fontSize="8">
           (tu)
         </text>
       </g>
 
-      {/* ─── Propagation pulse dots ─── */}
-      {pulses.map(pulse => {
-        const isToMe = pulse.toId === participant.id;
-        const isFromMe = pulse.fromId === participant.id;
-        const fromPos = isFromMe ? { x: cx, y: cy }
-                      : neighborPositions.find(n => n.id === pulse.fromId);
-        const toPos = isToMe ? { x: cx, y: cy }
-                    : neighborPositions.find(n => n.id === pulse.toId);
-        if (!fromPos || !toPos) return null;
-        return (
-          <circle
-            key={pulse.id}
-            cx={fromPos.x}
-            cy={fromPos.y}
-            r={5}
-            fill="#facc15"
-            filter="url(#mini-pulse-glow)"
-            opacity={0}
-          >
-            <animate attributeName="cx" from={fromPos.x} to={toPos.x} dur={`${PULSE_DUR_S}s`} fill="freeze" />
-            <animate attributeName="cy" from={fromPos.y} to={toPos.y} dur={`${PULSE_DUR_S}s`} fill="freeze" />
-            <animate attributeName="opacity" values="0;0.95;0.95;0.7" dur={`${PULSE_DUR_S}s`} fill="freeze" />
-          </circle>
-        );
-      })}
+      {/* Pulse dots (rAF-driven, rendered by parent) */}
+      {renderedPulses.map(p => (
+        <circle key={p.id} cx={p.x} cy={p.y} r={p.r}
+          fill="#facc15" opacity={p.opacity} filter="url(#mini-pulse-glow)" />
+      ))}
 
-      {/* ─── Node flash (glow + expanding ring) ─── */}
-      {flashes.map(flash => {
-        const isMe = flash.nodeId === participant.id;
-        const pos = isMe ? { x: cx, y: cy }
-                  : neighborPositions.find(n => n.id === flash.nodeId);
-        const r = isMe ? 28 : 22;
-        if (!pos) return null;
-        return (
-          <g key={`flash-${flash.nodeId}-${flash.time}`}>
-            {/* Inner glow overlay */}
-            <circle cx={pos.x} cy={pos.y} r={r} fill="#facc15" opacity={0}>
-              <animate attributeName="opacity" values="0;0.45;0.25;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
-            </circle>
-            {/* Expanding ring */}
-            <circle cx={pos.x} cy={pos.y} r={r} fill="none" stroke="#facc15" strokeWidth={2} opacity={0}>
-              <animate attributeName="r" from={`${r}`} to={`${r + 16}`} dur={`${FLASH_DUR_S}s`} fill="freeze" />
-              <animate attributeName="opacity" values="0;0.6;0.3;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
-            </circle>
-          </g>
-        );
-      })}
+      {/* Flash effects (rAF-driven, rendered by parent) */}
+      {renderedFlashes.map(f => (
+        <g key={f.id}>
+          <circle cx={f.cx} cy={f.cy} r={MINI_NODE_R}
+            fill="#facc15" opacity={f.glowOpacity} />
+          <circle cx={f.cx} cy={f.cy} r={f.ringR}
+            fill="none" stroke="#facc15" strokeWidth={2} opacity={f.ringOpacity} />
+        </g>
+      ))}
     </svg>
   );
 }
@@ -281,48 +205,146 @@ export default function Phase5UserInterface({
     [room.participants, participant.id]
   );
 
-  // TX that have arrived at my node
-  const myTransactions = useMemo(() =>
-    mempoolTransactions
-      .filter(tx => tx.propagatedTo?.includes(participant.id) || tx.senderId === participant.id)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [mempoolTransactions, participant.id]
-  );
+  // TX that have arrived at my node — sorted by LOCAL arrival order, not server creation time
+  const firstSeenRef = useRef<Map<string, number>>(new Map());
+  const myTransactions = useMemo(() => {
+    const now = Date.now();
+    const myTxs = mempoolTransactions
+      .filter(tx => tx.propagatedTo?.includes(participant.id) || tx.senderId === participant.id);
+    // Record first-seen time for newly arrived TX
+    for (const tx of myTxs) {
+      if (!firstSeenRef.current.has(tx.id)) {
+        firstSeenRef.current.set(tx.id, now);
+      }
+    }
+    // Sort by local arrival time (newest first)
+    return [...myTxs].sort((a, b) => {
+      const aTime = firstSeenRef.current.get(a.id) ?? 0;
+      const bTime = firstSeenRef.current.get(b.id) ?? 0;
+      return bTime - aTime;
+    });
+  }, [mempoolTransactions, participant.id]);
 
-  // ─── Propagation pulse tracking (BFS cascade) ───
+  // ─── Propagation animation (rAF-based) ───
+  // Compute mini-graph node positions (must match MiniNodeGraph layout)
+  const miniGraphPositions = useMemo(() => {
+    const positions = new Map<string, { x: number; y: number; r: number }>();
+    positions.set(participant.id, { x: MINI_CX, y: MINI_CY, r: MY_NODE_R });
+    myNeighbors.forEach((n, i) => {
+      const angle = ((2 * Math.PI) / Math.max(myNeighbors.length, 1)) * i - Math.PI / 2;
+      positions.set(n.id, {
+        x: MINI_CX + MINI_RADIUS * Math.cos(angle),
+        y: MINI_CY + MINI_RADIUS * Math.sin(angle),
+        r: MINI_NODE_R,
+      });
+    });
+    return positions;
+  }, [participant.id, myNeighbors]);
+
   const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
-  const [activePulses, setActivePulses] = useState<{ id: string; fromId: string; toId: string; createdAt: number }[]>([]);
-  const [flashes, setFlashes] = useState<{ nodeId: string; time: number }[]>([]);
+  const pulsesRef = useRef<{ id: string; fromX: number; fromY: number; toX: number; toY: number; toNodeId: string; startTime: number }[]>([]);
+  const flashesRef = useRef<{ id: string; cx: number; cy: number; startTime: number }[]>([]);
+  const rAFRef = useRef<number>(0);
+  const isAnimatingRef = useRef(false);
+  const [renderedPulses, setRenderedPulses] = useState<{ id: string; x: number; y: number; opacity: number; r: number }[]>([]);
+  const [renderedFlashes, setRenderedFlashes] = useState<{ id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number }[]>([]);
 
+  const startAnimation = useCallback(() => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    let lastFrame = 0;
+    const animate = (timestamp: number) => {
+      if (timestamp - lastFrame < 33) {
+        rAFRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrame = timestamp;
+      const now = Date.now();
+
+      const activePulses: typeof pulsesRef.current = [];
+      const pulsePositions: typeof renderedPulses = [];
+      const completedPulses: typeof pulsesRef.current = [];
+
+      for (const pulse of pulsesRef.current) {
+        const elapsed = now - pulse.startTime;
+        if (elapsed < 0) { activePulses.push(pulse); continue; }
+        const progress = elapsed / (PULSE_DUR_S * 1000);
+        if (progress < 1) {
+          const t = 1 - Math.pow(1 - progress, 2);
+          pulsePositions.push({
+            id: pulse.id,
+            x: pulse.fromX + (pulse.toX - pulse.fromX) * t,
+            y: pulse.fromY + (pulse.toY - pulse.fromY) * t,
+            opacity: progress < 0.1 ? progress * 10 : 0.95,
+            r: 4 + 3 * Math.sin(progress * Math.PI),
+          });
+          activePulses.push(pulse);
+        } else {
+          completedPulses.push(pulse);
+        }
+      }
+      pulsesRef.current = activePulses;
+      setRenderedPulses(pulsePositions);
+
+      if (completedPulses.length > 0) {
+        const newFlashes = completedPulses.map(p => ({
+          id: `f-${p.toNodeId}-${now}-${p.id.slice(-4)}`,
+          cx: p.toX, cy: p.toY, startTime: now,
+        }));
+        flashesRef.current = [...flashesRef.current, ...newFlashes];
+      }
+
+      const activeFlashes: typeof flashesRef.current = [];
+      const flashPositions: typeof renderedFlashes = [];
+      for (const flash of flashesRef.current) {
+        const progress = (now - flash.startTime) / (FLASH_DUR_S * 1000);
+        if (progress < 1) {
+          const nodeR = MINI_NODE_R;
+          const glowOpacity = progress < 0.3 ? (progress / 0.3) * 0.45 : 0.45 * (1 - (progress - 0.3) / 0.7);
+          const ringR = nodeR + 16 * progress;
+          const ringOpacity = progress < 0.2 ? (progress / 0.2) * 0.6 : 0.6 * (1 - (progress - 0.2) / 0.8);
+          flashPositions.push({ id: flash.id, cx: flash.cx, cy: flash.cy, glowOpacity, ringR, ringOpacity });
+          activeFlashes.push(flash);
+        }
+      }
+      flashesRef.current = activeFlashes;
+      setRenderedFlashes(flashPositions);
+
+      if (activePulses.length > 0 || activeFlashes.length > 0) {
+        rAFRef.current = requestAnimationFrame(animate);
+      } else {
+        isAnimatingRef.current = false;
+      }
+    };
+    rAFRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  useEffect(() => () => cancelAnimationFrame(rAFRef.current), []);
+
+  // Detect propagation changes → create pulses with BFS cascade
   useEffect(() => {
     const prevMap = prevPropRef.current;
     const now = Date.now();
-    const myId = participant.id;
-    const relevantIds = new Set([myId, ...myNeighborIds]);
+    const relevantIds = new Set([participant.id, ...myNeighborIds]);
+    let hasNew = false;
 
     for (const tx of mempoolTransactions) {
       const currentSet = new Set(tx.propagatedTo || []);
       const prevSet = prevMap.get(tx.id) || new Set<string>();
-
-      // Find newly added relevant nodes
-      const newNodes = new Set<string>();
+      let hasNewNodes = false;
       for (const nodeId of currentSet) {
-        if (!prevSet.has(nodeId) && relevantIds.has(nodeId)) newNodes.add(nodeId);
+        if (!prevSet.has(nodeId)) { hasNewNodes = true; break; }
       }
 
-      if (newNodes.size > 0) {
-        // BFS from prev frontier to reconstruct cascade
-        const visited = new Set<string>();
-        for (const id of prevSet) { if (relevantIds.has(id)) visited.add(id); }
-        // Also include non-relevant prev nodes as "already visited" to find correct sources
+      if (hasNewNodes) {
+        const visited = new Set(prevSet);
         for (const id of prevSet) visited.add(id);
-
-        let bfsFrontier = [...prevSet].filter(id => relevantIds.has(id) || prevSet.has(id));
-        const layers: { fromId: string; toId: string }[][] = [];
+        let bfsFrontier = [...prevSet];
+        let layerIdx = 0;
 
         while (bfsFrontier.length > 0) {
-          const layerPulses: { fromId: string; toId: string }[] = [];
           const nextFrontier: string[] = [];
+          const layerDelay = layerIdx * PULSE_DUR_S * 1000;
 
           for (const sourceId of bfsFrontier) {
             for (const conn of nodeConnections) {
@@ -332,48 +354,33 @@ export default function Phase5UserInterface({
               if (!nId || visited.has(nId) || !currentSet.has(nId)) continue;
               visited.add(nId);
               nextFrontier.push(nId);
-              // Only create visual pulse if both ends are relevant (visible)
+              // Only create visible pulse if both ends are in my view
               if (relevantIds.has(sourceId) && relevantIds.has(nId)) {
-                layerPulses.push({ fromId: sourceId, toId: nId });
+                const from = miniGraphPositions.get(sourceId);
+                const to = miniGraphPositions.get(nId);
+                if (from && to) {
+                  pulsesRef.current.push({
+                    id: `p-${tx.id}-${sourceId}-${nId}-${now}-L${layerIdx}`,
+                    fromX: from.x, fromY: from.y, toX: to.x, toY: to.y,
+                    toNodeId: nId, startTime: now + layerDelay,
+                  });
+                  hasNew = true;
+                }
               }
             }
           }
-
-          if (layerPulses.length > 0) layers.push(layerPulses);
           bfsFrontier = nextFrontier;
+          layerIdx++;
         }
-
-        // Schedule each layer with staggered timing
-        layers.forEach((layer, layerIdx) => {
-          const delay = layerIdx * PULSE_DUR_S * 1000;
-          const pulses = layer.map((p, i) => ({
-            id: `p-${tx.id}-${p.fromId}-${p.toId}-${now}-L${layerIdx}-${i}`,
-            fromId: p.fromId,
-            toId: p.toId,
-            createdAt: now + layerIdx,
-          }));
-
-          setTimeout(() => {
-            setActivePulses(prev => [...prev, ...pulses]);
-            setTimeout(() => {
-              const flashTime = Date.now();
-              const newFlashes = pulses.map(p => ({ nodeId: p.toId, time: flashTime }));
-              setFlashes(prev => [...prev, ...newFlashes]);
-              setTimeout(() => {
-                setFlashes(prev => prev.filter(f => f.time !== flashTime));
-              }, FLASH_DUR_S * 1000 + 200);
-            }, PULSE_DUR_S * 1000);
-            setTimeout(() => {
-              const ids = new Set(pulses.map(p => p.id));
-              setActivePulses(prev => prev.filter(p => !ids.has(p.id)));
-            }, PULSE_DUR_S * 1000 + 400);
-          }, delay);
-        });
       }
-
       prevMap.set(tx.id, currentSet);
     }
-  }, [mempoolTransactions, nodeConnections, participant.id, myNeighborIds]);
+
+    if (hasNew) {
+      isAnimatingRef.current = false;
+      startAnimation();
+    }
+  }, [mempoolTransactions, nodeConnections, participant.id, myNeighborIds, miniGraphPositions, startAnimation]);
 
   // Auto-dismiss feedback
   useEffect(() => {
@@ -458,8 +465,8 @@ export default function Phase5UserInterface({
               participant={participant}
               myNeighbors={myNeighbors}
               nodeConnections={nodeConnections}
-              pulses={activePulses}
-              flashes={flashes}
+              renderedPulses={renderedPulses}
+              renderedFlashes={renderedFlashes}
             />
           )}
         </motion.div>

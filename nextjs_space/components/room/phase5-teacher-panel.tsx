@@ -175,87 +175,6 @@ export default function Phase5TeacherPanel({
   const mempoolCount = mempoolTransactions.filter(tx => tx.status === 'in_mempool').length;
   const propagatingCount = mempoolTransactions.filter(tx => tx.status === 'propagating').length;
 
-  // ─── Propagation pulses (traveling dot + cascaded BFS + node flash) ───
-  const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
-  const [activePulses, setActivePulses] = useState<{ id: string; fromId: string; toId: string; createdAt: number }[]>([]);
-  const [flashes, setFlashes] = useState<{ nodeId: string; time: number }[]>([]);
-
-  useEffect(() => {
-    const prevMap = prevPropRef.current;
-    const now = Date.now();
-
-    for (const tx of mempoolTransactions) {
-      const currentSet = new Set(tx.propagatedTo || []);
-      const prevSet = prevMap.get(tx.id) || new Set<string>();
-
-      // Find newly added nodes
-      const newNodes = new Set<string>();
-      for (const nodeId of currentSet) {
-        if (!prevSet.has(nodeId)) newNodes.add(nodeId);
-      }
-
-      if (newNodes.size > 0) {
-        // BFS from prev frontier to reconstruct propagation cascade
-        const visited = new Set(prevSet);
-        let bfsFrontier = [...prevSet];
-        const layers: { fromId: string; toId: string }[][] = [];
-
-        while (bfsFrontier.length > 0) {
-          const layerPulses: { fromId: string; toId: string }[] = [];
-          const nextFrontier: string[] = [];
-
-          for (const sourceId of bfsFrontier) {
-            for (const conn of nodeConnections) {
-              if (!conn.isActive) continue;
-              const nId = conn.nodeAId === sourceId ? conn.nodeBId
-                        : conn.nodeBId === sourceId ? conn.nodeAId : null;
-              if (!nId || visited.has(nId) || !currentSet.has(nId)) continue;
-              visited.add(nId);
-              nextFrontier.push(nId);
-              layerPulses.push({ fromId: sourceId, toId: nId });
-            }
-          }
-
-          if (layerPulses.length > 0) layers.push(layerPulses);
-          bfsFrontier = nextFrontier;
-        }
-
-        // Schedule each layer with staggered timing
-        layers.forEach((layer, layerIdx) => {
-          const delay = layerIdx * PULSE_DUR_S * 1000;
-          const batchTime = now + layerIdx;
-
-          const pulses = layer.map((p, i) => ({
-            id: `p-${tx.id}-${p.fromId}-${p.toId}-${now}-L${layerIdx}-${i}`,
-            fromId: p.fromId,
-            toId: p.toId,
-            createdAt: batchTime,
-          }));
-
-          setTimeout(() => {
-            setActivePulses(prev => [...prev, ...pulses]);
-            // Flash when this layer's pulses arrive
-            setTimeout(() => {
-              const flashTime = Date.now();
-              const newFlashes = pulses.map(p => ({ nodeId: p.toId, time: flashTime }));
-              setFlashes(prev => [...prev, ...newFlashes]);
-              setTimeout(() => {
-                setFlashes(prev => prev.filter(f => f.time !== flashTime));
-              }, FLASH_DUR_S * 1000 + 200);
-            }, PULSE_DUR_S * 1000);
-            // Cleanup these pulses
-            setTimeout(() => {
-              const ids = new Set(pulses.map(p => p.id));
-              setActivePulses(prev => prev.filter(p => !ids.has(p.id)));
-            }, PULSE_DUR_S * 1000 + 400);
-          }, delay);
-        });
-      }
-
-      prevMap.set(tx.id, currentSet);
-    }
-  }, [mempoolTransactions, nodeConnections]);
-
   // Force layout — use a larger internal canvas so nodes spread out
   const layoutWidth = 1200;
   const layoutHeight = 800;
@@ -271,6 +190,148 @@ export default function Phase5TeacherPanel({
       .map(c => ({ id: c.id, a: c.nodeAId, b: c.nodeBId }));
     return computeForceLayout(nodes, edges, layoutWidth, layoutHeight);
   }, [students, nodeConnections]);
+
+  // ─── Propagation animation (rAF-based, NOT SMIL) ───
+  const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
+  const pulsesRef = useRef<{ id: string; fromX: number; fromY: number; toX: number; toY: number; toNodeId: string; startTime: number }[]>([]);
+  const flashesRef = useRef<{ id: string; cx: number; cy: number; startTime: number }[]>([]);
+  const rAFRef = useRef<number>(0);
+  const isAnimatingRef = useRef(false);
+  const [renderedPulses, setRenderedPulses] = useState<{ id: string; x: number; y: number; opacity: number; r: number }[]>([]);
+  const [renderedFlashes, setRenderedFlashes] = useState<{ id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number }[]>([]);
+
+  const startAnimation = useCallback(() => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    let lastFrame = 0;
+    const animate = (timestamp: number) => {
+      if (timestamp - lastFrame < 33) { // ~30fps
+        rAFRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrame = timestamp;
+      const now = Date.now();
+
+      // Process pulses
+      const activePulses: typeof pulsesRef.current = [];
+      const pulsePositions: typeof renderedPulses = [];
+      const completedPulses: typeof pulsesRef.current = [];
+
+      for (const pulse of pulsesRef.current) {
+        const elapsed = now - pulse.startTime;
+        if (elapsed < 0) { activePulses.push(pulse); continue; } // future start
+        const progress = elapsed / (PULSE_DUR_S * 1000);
+        if (progress < 1) {
+          const t = 1 - Math.pow(1 - progress, 2); // ease-out
+          pulsePositions.push({
+            id: pulse.id,
+            x: pulse.fromX + (pulse.toX - pulse.fromX) * t,
+            y: pulse.fromY + (pulse.toY - pulse.fromY) * t,
+            opacity: progress < 0.1 ? progress * 10 : 0.95,
+            r: 5 + 4 * Math.sin(progress * Math.PI),
+          });
+          activePulses.push(pulse);
+        } else {
+          completedPulses.push(pulse);
+        }
+      }
+      pulsesRef.current = activePulses;
+      setRenderedPulses(pulsePositions);
+
+      // Create flashes for completed pulses
+      if (completedPulses.length > 0) {
+        const newFlashes = completedPulses.map(p => ({
+          id: `f-${p.toNodeId}-${now}-${p.id.slice(-4)}`,
+          cx: p.toX, cy: p.toY,
+          startTime: now,
+        }));
+        flashesRef.current = [...flashesRef.current, ...newFlashes];
+      }
+
+      // Process flashes
+      const activeFlashes: typeof flashesRef.current = [];
+      const flashPositions: typeof renderedFlashes = [];
+      for (const flash of flashesRef.current) {
+        const progress = (now - flash.startTime) / (FLASH_DUR_S * 1000);
+        if (progress < 1) {
+          const glowOpacity = progress < 0.3 ? (progress / 0.3) * 0.45 : 0.45 * (1 - (progress - 0.3) / 0.7);
+          const ringR = NODE_RADIUS + 22 * progress;
+          const ringOpacity = progress < 0.2 ? (progress / 0.2) * 0.6 : 0.6 * (1 - (progress - 0.2) / 0.8);
+          flashPositions.push({ id: flash.id, cx: flash.cx, cy: flash.cy, glowOpacity, ringR, ringOpacity });
+          activeFlashes.push(flash);
+        }
+      }
+      flashesRef.current = activeFlashes;
+      setRenderedFlashes(flashPositions);
+
+      if (activePulses.length > 0 || activeFlashes.length > 0) {
+        rAFRef.current = requestAnimationFrame(animate);
+      } else {
+        isAnimatingRef.current = false;
+      }
+    };
+    rAFRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  // Cleanup rAF on unmount
+  useEffect(() => () => cancelAnimationFrame(rAFRef.current), []);
+
+  // Detect propagation changes → create pulses with pixel coords + BFS cascade
+  useEffect(() => {
+    const prevMap = prevPropRef.current;
+    const now = Date.now();
+    let hasNew = false;
+
+    for (const tx of mempoolTransactions) {
+      const currentSet = new Set(tx.propagatedTo || []);
+      const prevSet = prevMap.get(tx.id) || new Set<string>();
+      let hasNewNodes = false;
+      for (const nodeId of currentSet) {
+        if (!prevSet.has(nodeId)) { hasNewNodes = true; break; }
+      }
+
+      if (hasNewNodes) {
+        // BFS cascade from prev frontier
+        const visited = new Set(prevSet);
+        let bfsFrontier = [...prevSet];
+        let layerIdx = 0;
+
+        while (bfsFrontier.length > 0) {
+          const nextFrontier: string[] = [];
+          const layerDelay = layerIdx * PULSE_DUR_S * 1000;
+
+          for (const sourceId of bfsFrontier) {
+            for (const conn of nodeConnections) {
+              if (!conn.isActive) continue;
+              const nId = conn.nodeAId === sourceId ? conn.nodeBId
+                        : conn.nodeBId === sourceId ? conn.nodeAId : null;
+              if (!nId || visited.has(nId) || !currentSet.has(nId)) continue;
+              visited.add(nId);
+              nextFrontier.push(nId);
+              const from = layoutPositions.get(sourceId);
+              const to = layoutPositions.get(nId);
+              if (from && to) {
+                pulsesRef.current.push({
+                  id: `p-${tx.id}-${sourceId}-${nId}-${now}-L${layerIdx}`,
+                  fromX: from.x, fromY: from.y, toX: to.x, toY: to.y,
+                  toNodeId: nId, startTime: now + layerDelay,
+                });
+                hasNew = true;
+              }
+            }
+          }
+          bfsFrontier = nextFrontier;
+          layerIdx++;
+        }
+      }
+      prevMap.set(tx.id, currentSet);
+    }
+
+    if (hasNew) {
+      isAnimatingRef.current = false; // allow restart
+      startAnimation();
+    }
+  }, [mempoolTransactions, nodeConnections, layoutPositions, startAnimation]);
 
   // Compute a viewBox that fits all nodes with padding
   const fittedViewBox = useMemo(() => {
@@ -632,59 +693,21 @@ export default function Phase5TeacherPanel({
               );
             })}
 
-            {/* ─── Propagation pulse dots ─── */}
-            {activePulses.map(pulse => {
-              const from = layoutPositions.get(pulse.fromId);
-              const to = layoutPositions.get(pulse.toId);
-              if (!from || !to) return null;
-              return (
-                <circle
-                  key={pulse.id}
-                  cx={from.x}
-                  cy={from.y}
-                  r={7}
-                  fill="#facc15"
-                  filter="url(#pulse-glow)"
-                  opacity={0}
-                >
-                  <animate attributeName="cx" from={from.x} to={to.x} dur={`${PULSE_DUR_S}s`} fill="freeze" />
-                  <animate attributeName="cy" from={from.y} to={to.y} dur={`${PULSE_DUR_S}s`} fill="freeze" />
-                  <animate attributeName="opacity" values="0;0.95;0.95;0.7" dur={`${PULSE_DUR_S}s`} fill="freeze" />
-                  <animate attributeName="r" values="5;8;7" dur={`${PULSE_DUR_S}s`} fill="freeze" />
-                </circle>
-              );
-            })}
+            {/* ─── Propagation pulse dots (rAF-driven) ─── */}
+            {renderedPulses.map(p => (
+              <circle key={p.id} cx={p.x} cy={p.y} r={p.r}
+                fill="#facc15" opacity={p.opacity} filter="url(#pulse-glow)" />
+            ))}
 
-            {/* ─── Node flash (glow overlay + expanding ring) ─── */}
-            {flashes.map(flash => {
-              const pos = layoutPositions.get(flash.nodeId);
-              if (!pos) return null;
-              return (
-                <g key={`flash-${flash.nodeId}-${flash.time}`}>
-                  {/* Inner glow overlay on the node */}
-                  <circle
-                    cx={pos.x} cy={pos.y}
-                    r={NODE_RADIUS}
-                    fill="#facc15"
-                    opacity={0}
-                  >
-                    <animate attributeName="opacity" values="0;0.45;0.25;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
-                  </circle>
-                  {/* Expanding ring */}
-                  <circle
-                    cx={pos.x} cy={pos.y}
-                    r={NODE_RADIUS}
-                    fill="none"
-                    stroke="#facc15"
-                    strokeWidth={2.5}
-                    opacity={0}
-                  >
-                    <animate attributeName="r" from={`${NODE_RADIUS}`} to={`${NODE_RADIUS + 22}`} dur={`${FLASH_DUR_S}s`} fill="freeze" />
-                    <animate attributeName="opacity" values="0;0.6;0.3;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
-                  </circle>
-                </g>
-              );
-            })}
+            {/* ─── Node flash effects (rAF-driven) ─── */}
+            {renderedFlashes.map(f => (
+              <g key={f.id}>
+                <circle cx={f.cx} cy={f.cy} r={NODE_RADIUS}
+                  fill="#facc15" opacity={f.glowOpacity} />
+                <circle cx={f.cx} cy={f.cy} r={f.ringR}
+                  fill="none" stroke="#facc15" strokeWidth={2.5} opacity={f.ringOpacity} />
+              </g>
+            ))}
           </svg>
         </div>
       )}
