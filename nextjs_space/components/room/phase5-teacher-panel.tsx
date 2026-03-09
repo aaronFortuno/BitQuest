@@ -44,6 +44,9 @@ interface NodePos {
   name: string;
 }
 
+const NODE_RADIUS = 30;
+const MIN_NODE_DISTANCE = NODE_RADIUS * 4; // Minimum distance between node centers
+
 function computeForceLayout(
   nodes: { id: string; name: string; disconnected: boolean }[],
   edges: { id: string; a: string; b: string }[],
@@ -52,10 +55,10 @@ function computeForceLayout(
 ): Map<string, { x: number; y: number }> {
   if (nodes.length === 0) return new Map();
 
-  // Initialize positions in a circle
+  // Initialize positions in a circle with generous radius
   const positions: NodePos[] = nodes.map((n, i) => {
     const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-    const r = Math.min(width, height) * 0.35;
+    const r = Math.min(width, height) * 0.4;
     return {
       id: n.id,
       x: width / 2 + r * Math.cos(angle),
@@ -70,15 +73,16 @@ function computeForceLayout(
   const posMap = new Map<string, NodePos>();
   positions.forEach(p => posMap.set(p.id, p));
 
-  // Run a few iterations of force simulation
-  const iterations = 80;
-  const repulsion = 3000;
-  const attraction = 0.04;
-  const damping = 0.85;
-  const centerPull = 0.01;
+  // Force simulation tuned for well-separated nodes
+  const iterations = 120;
+  const repulsion = 25000; // Strong repulsion to keep nodes apart
+  const idealEdgeLength = MIN_NODE_DISTANCE * 1.5; // Target distance for connected nodes
+  const edgeStiffness = 0.06;
+  const damping = 0.82;
+  const centerPull = 0.005;
 
   for (let iter = 0; iter < iterations; iter++) {
-    // Repulsion between all pairs
+    // Repulsion between all pairs (Coulomb's law)
     for (let i = 0; i < positions.length; i++) {
       for (let j = i + 1; j < positions.length; j++) {
         const a = positions[i];
@@ -86,32 +90,43 @@ function computeForceLayout(
         let dx = b.x - a.x;
         let dy = b.y - a.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const force = repulsion / (dist * dist);
-        dx = (dx / dist) * force;
-        dy = (dy / dist) * force;
-        a.vx -= dx;
-        a.vy -= dy;
-        b.vx += dx;
-        b.vy += dy;
+
+        // Extra strong push when nodes overlap
+        const minDist = MIN_NODE_DISTANCE;
+        let force: number;
+        if (dist < minDist) {
+          force = repulsion / (minDist * minDist) * (minDist / dist);
+        } else {
+          force = repulsion / (dist * dist);
+        }
+
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        a.vx -= fx;
+        a.vy -= fy;
+        b.vx += fx;
+        b.vy += fy;
       }
     }
 
-    // Attraction along edges
+    // Attraction along edges (spring toward ideal length)
     for (const edge of edges) {
       const a = posMap.get(edge.a);
       const b = posMap.get(edge.b);
       if (!a || !b) continue;
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      const fx = dx * attraction;
-      const fy = dy * attraction;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const displacement = dist - idealEdgeLength;
+      const fx = (dx / dist) * displacement * edgeStiffness;
+      const fy = (dy / dist) * displacement * edgeStiffness;
       a.vx += fx;
       a.vy += fy;
       b.vx -= fx;
       b.vy -= fy;
     }
 
-    // Center gravity
+    // Gentle center gravity
     for (const p of positions) {
       p.vx += (width / 2 - p.x) * centerPull;
       p.vy += (height / 2 - p.y) * centerPull;
@@ -123,12 +138,10 @@ function computeForceLayout(
       p.vy *= damping;
       p.x += p.vx;
       p.y += p.vy;
-      // Keep in bounds
-      p.x = Math.max(30, Math.min(width - 30, p.x));
-      p.y = Math.max(30, Math.min(height - 30, p.y));
     }
   }
 
+  // No clamping to bounds — let the viewBox adapt to actual positions
   const result = new Map<string, { x: number; y: number }>();
   positions.forEach(p => result.set(p.id, { x: p.x, y: p.y }));
   return result;
@@ -484,7 +497,7 @@ export default function Phase5TeacherPanel({
             })}
 
             {/* Node circles */}
-            {students.map(student => {
+            {students.map((student, idx) => {
               const pos = layoutPositions.get(student.id);
               if (!pos) return null;
               const isDisconnected = student.isNodeDisconnected || false;
@@ -492,16 +505,32 @@ export default function Phase5TeacherPanel({
                 tx.propagatedTo?.includes(student.id)
               ).length;
 
+              // Floating animation params (unique per node)
+              const seed = student.id.charCodeAt(0) + idx * 7;
+              const durX = 4 + (seed % 3);
+              const durY = 5 + (seed % 4);
+              const ampX = 3 + (seed % 3);
+              const ampY = 2 + (seed % 3);
+
               return (
                 <g
                   key={student.id}
                   className="cursor-pointer"
                   onClick={() => handleNodeClick(student.id)}
                 >
+                  {/* Floating animation wrapper */}
+                  <animateTransform
+                    attributeName="transform"
+                    type="translate"
+                    values={`0,0; ${ampX},${-ampY}; ${-ampX},${ampY}; 0,0`}
+                    dur={`${durX}s`}
+                    repeatCount="indefinite"
+                    additive="sum"
+                  />
                   {/* Node circle */}
                   <circle
                     cx={pos.x} cy={pos.y}
-                    r={30}
+                    r={NODE_RADIUS}
                     fill={isDisconnected ? '#7f1d1d' : '#1e3a5f'}
                     stroke={
                       isDisconnected ? '#ef4444'

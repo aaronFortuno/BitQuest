@@ -34,6 +34,31 @@ export async function POST(req: NextRequest) {
       isActive: true,
     });
 
+    // Auto-connect to network if Phase 5 connections already exist
+    const existingConnections = store.getNodeConnectionsByRoom(state.room.id);
+    if (existingConnections.filter(c => c.isActive).length > 0) {
+      // Find 2-3 random active students (not self) with fewer than 3 connections
+      const otherStudents = Array.from(state.participants.values())
+        .filter(p => p.isActive && p.role === 'student' && p.id !== participant.id && !p.isNodeDisconnected);
+
+      const shuffled = otherStudents.sort(() => Math.random() - 0.5);
+      const targetConns = 2 + (Math.random() > 0.5 ? 1 : 0); // 2 or 3
+      let connected = 0;
+
+      for (const peer of shuffled) {
+        if (connected >= targetConns) break;
+        const peerConns = store.getActiveConnectionsForNode(peer.id, state.room.id);
+        if (peerConns.length < 4) { // allow connecting even if peer has 3
+          store.createNodeConnection(state.room.id, {
+            nodeAId: participant.id,
+            nodeBId: peer.id,
+            isActive: true,
+          });
+          connected++;
+        }
+      }
+    }
+
     // Build updated room response
     const participants = Array.from(state.participants.values())
       .filter(p => p.isActive)
