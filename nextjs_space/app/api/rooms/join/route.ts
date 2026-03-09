@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       for (const peer of shuffled) {
         if (connected >= targetConns) break;
         const peerConns = store.getActiveConnectionsForNode(peer.id, state.room.id);
-        if (peerConns.length < 4) { // allow connecting even if peer has 3
+        if (peerConns.length < 3) { // max 3 connections per node
           store.createNodeConnection(state.room.id, {
             nodeAId: participant.id,
             nodeBId: peer.id,
