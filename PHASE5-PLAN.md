@@ -288,5 +288,5 @@ La UI renderitza amb les noves props.
 - [x] Pas 4: Interficie alumne (reescriptura)
 - [x] Pas 5: Interficie professor (reescriptura seccio fase 5)
 - [x] Pas 6: Hook i router
-- [ ] Pas 7: Polish i animacions
+- [x] Pas 7: Polish i animacions (pulsos de propagació + flash nodes)
 - [ ] Pas 8: Traduccions i instruccions

@@ -46,6 +46,8 @@ interface NodePos {
 
 const NODE_RADIUS = 30;
 const MIN_NODE_DISTANCE = NODE_RADIUS * 4; // Minimum distance between node centers
+const PULSE_DUR_S = 1.2; // seconds for pulse to travel along an edge
+const FLASH_DUR_S = 0.5; // seconds for node flash ring
 
 function computeForceLayout(
   nodes: { id: string; name: string; disconnected: boolean }[],
@@ -190,6 +192,68 @@ export default function Phase5TeacherPanel({
       }
     }
     return edges;
+  }, [mempoolTransactions, nodeConnections]);
+
+  // ─── Propagation pulses (traveling dot + node flash) ───
+  const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
+  const [activePulses, setActivePulses] = useState<{ id: string; fromId: string; toId: string; createdAt: number }[]>([]);
+  const [flashes, setFlashes] = useState<{ nodeId: string; time: number }[]>([]);
+
+  useEffect(() => {
+    const prevMap = prevPropRef.current;
+    const newPulses: { id: string; fromId: string; toId: string; createdAt: number }[] = [];
+    const now = Date.now();
+
+    for (const tx of mempoolTransactions) {
+      const currentSet = new Set(tx.propagatedTo || []);
+      const prevSet = prevMap.get(tx.id) || new Set<string>();
+
+      for (const nodeId of currentSet) {
+        if (prevSet.has(nodeId)) continue;
+
+        // Find source: neighbor already in prev set (sent us the TX)
+        let sourceId: string | null = null;
+        for (const conn of nodeConnections) {
+          if (!conn.isActive) continue;
+          const nId = conn.nodeAId === nodeId ? conn.nodeBId
+                    : conn.nodeBId === nodeId ? conn.nodeAId : null;
+          if (!nId) continue;
+          if (prevSet.has(nId)) { sourceId = nId; break; }
+        }
+        // Fallback: any connected neighbor in current set
+        if (!sourceId) {
+          for (const conn of nodeConnections) {
+            if (!conn.isActive) continue;
+            const nId = conn.nodeAId === nodeId ? conn.nodeBId
+                      : conn.nodeBId === nodeId ? conn.nodeAId : null;
+            if (!nId) continue;
+            if (currentSet.has(nId) && nId !== nodeId) { sourceId = nId; break; }
+          }
+        }
+
+        if (sourceId) {
+          newPulses.push({ id: `p-${tx.id}-${sourceId}-${nodeId}-${now}`, fromId: sourceId, toId: nodeId, createdAt: now });
+        }
+      }
+      prevMap.set(tx.id, currentSet);
+    }
+
+    if (newPulses.length > 0) {
+      setActivePulses(prev => [...prev, ...newPulses]);
+      // Flash destination nodes when pulse arrives
+      const flashTime = now;
+      setTimeout(() => {
+        const newFlashes = newPulses.map(p => ({ nodeId: p.toId, time: flashTime }));
+        setFlashes(prev => [...prev, ...newFlashes]);
+        setTimeout(() => {
+          setFlashes(prev => prev.filter(f => f.time !== flashTime));
+        }, FLASH_DUR_S * 1000 + 100);
+      }, PULSE_DUR_S * 1000);
+      // Cleanup pulses after animation
+      setTimeout(() => {
+        setActivePulses(prev => prev.filter(p => p.createdAt !== now));
+      }, PULSE_DUR_S * 1000 + 300);
+    }
   }, [mempoolTransactions, nodeConnections]);
 
   // Force layout — use a larger internal canvas so nodes spread out
@@ -435,6 +499,15 @@ export default function Phase5TeacherPanel({
             onPointerLeave={handlePointerUp}
           >
             {/* Background rect for pan events */}
+            <defs>
+              <filter id="pulse-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
             <rect x={-9999} y={-9999} width={99999} height={99999} fill="transparent" />
             {/* Connection lines */}
             {nodeConnections.filter(c => c.isActive).map(conn => {
@@ -474,24 +547,6 @@ export default function Phase5TeacherPanel({
                     className={isDisconnectMode ? 'cursor-pointer' : ''}
                     onClick={isDisconnectMode ? () => handleEdgeClick(conn.id) : undefined}
                   />
-                  {/* Propagation glow */}
-                  {isPropagating && (
-                    <line
-                      x1={posA.x} y1={posA.y}
-                      x2={posB.x} y2={posB.y}
-                      stroke="#facc15"
-                      strokeWidth={10}
-                      strokeLinecap="round"
-                      opacity={0.25}
-                    >
-                      <animate
-                        attributeName="opacity"
-                        values="0.1;0.4;0.1"
-                        dur="1.5s"
-                        repeatCount="indefinite"
-                      />
-                    </line>
-                  )}
                 </g>
               );
             })}
@@ -580,6 +635,50 @@ export default function Phase5TeacherPanel({
                     </text>
                   )}
                 </g>
+              );
+            })}
+
+            {/* ─── Propagation pulse dots ─── */}
+            {activePulses.map(pulse => {
+              const from = layoutPositions.get(pulse.fromId);
+              const to = layoutPositions.get(pulse.toId);
+              if (!from || !to) return null;
+              return (
+                <circle
+                  key={pulse.id}
+                  cx={from.x}
+                  cy={from.y}
+                  r={7}
+                  fill="#facc15"
+                  filter="url(#pulse-glow)"
+                  opacity={0}
+                >
+                  <animate attributeName="cx" from={from.x} to={to.x} dur={`${PULSE_DUR_S}s`} fill="freeze" />
+                  <animate attributeName="cy" from={from.y} to={to.y} dur={`${PULSE_DUR_S}s`} fill="freeze" />
+                  <animate attributeName="opacity" values="0;0.95;0.95;0.7" dur={`${PULSE_DUR_S}s`} fill="freeze" />
+                  <animate attributeName="r" values="5;8;7" dur={`${PULSE_DUR_S}s`} fill="freeze" />
+                </circle>
+              );
+            })}
+
+            {/* ─── Node flash rings (expanding ring when pulse arrives) ─── */}
+            {flashes.map(flash => {
+              const pos = layoutPositions.get(flash.nodeId);
+              if (!pos) return null;
+              return (
+                <circle
+                  key={`flash-${flash.nodeId}-${flash.time}`}
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={NODE_RADIUS}
+                  fill="none"
+                  stroke="#facc15"
+                  strokeWidth={3}
+                  opacity={0}
+                >
+                  <animate attributeName="r" from={`${NODE_RADIUS}`} to={`${NODE_RADIUS + 20}`} dur={`${FLASH_DUR_S}s`} fill="freeze" />
+                  <animate attributeName="opacity" values="0;0.8;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
+                </circle>
               );
             })}
           </svg>
