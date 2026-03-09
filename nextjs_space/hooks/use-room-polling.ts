@@ -798,6 +798,63 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     await fetchMempoolTransactions();
   }, [room, fetchMempoolTransactions]);
 
+  // Phase 5: Create a teacher-initiated transaction from any node
+  const createTeacherTransaction = useCallback(async (originNodeId: string) => {
+    if (!room) return;
+
+    const students = room.participants.filter(p => p.isActive && p.role === 'student' && p.id !== originNodeId);
+    if (students.length === 0) return;
+
+    const receiver = students[Math.floor(Math.random() * students.length)];
+    const amount = Math.floor(Math.random() * 5) + 1;
+
+    try {
+      await fetch(apiUrl('/api/mempool'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: room.id,
+          originNodeId,
+          receiverId: receiver.id,
+          amount,
+        }),
+      });
+      await fetchMempoolTransactions();
+    } catch (err) {
+      console.error('Create teacher transaction error:', err);
+    }
+  }, [room, fetchMempoolTransactions]);
+
+  // Phase 5: Destroy a specific connection
+  const destroyConnection = useCallback(async (connectionId: string) => {
+    if (!room) return;
+
+    try {
+      await fetch(apiUrl(`/api/node-connections?connectionId=${connectionId}&roomId=${room.id}`), {
+        method: 'DELETE',
+      });
+      await fetchNodeConnections();
+    } catch (err) {
+      console.error('Destroy connection error:', err);
+    }
+  }, [room, fetchNodeConnections]);
+
+  // Phase 5: Toggle student sending permission
+  const toggleStudentSending = useCallback(async (enabled: boolean) => {
+    if (!room) return;
+
+    try {
+      await fetch(apiUrl(`/api/rooms/${room.id}/network`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentSendingEnabled: enabled }),
+      });
+      await fetchRoom();
+    } catch (err) {
+      console.error('Toggle student sending error:', err);
+    }
+  }, [room, fetchRoom]);
+
   // Phase 6, 7 & 8: Fetch blocks, difficulty info, halving info, and economic stats (uses roomUuidRef)
   const fetchBlocks = useCallback(async () => {
     const rid = roomUuidRef.current;
@@ -1518,6 +1575,9 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     createMempoolTransaction,
     toggleNodeDisconnection,
     fillMempool,
+    createTeacherTransaction,
+    destroyConnection,
+    toggleStudentSending,
     // Phase 6 & 7
     createPendingBlock,
     calculateMiningHash,

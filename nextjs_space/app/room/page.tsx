@@ -98,6 +98,9 @@ export default function RoomPage() {
     createMempoolTransaction,
     toggleNodeDisconnection,
     fillMempool,
+    createTeacherTransaction,
+    destroyConnection,
+    toggleStudentSending,
     // Phase 6, 7 & 8
     blocks,
     difficultyInfo,
@@ -440,6 +443,9 @@ export default function RoomPage() {
             onToggleNodeDisconnection={toggleNodeDisconnection}
             onFillMempool={fillMempool}
             onInitializeNetwork={initializeNetwork}
+            onCreateTeacherTransaction={createTeacherTransaction}
+            onDestroyConnection={destroyConnection}
+            onToggleStudentSending={toggleStudentSending}
             onCreatePendingBlock={createPendingBlock}
             onResetBlockchain={resetBlockchain}
             onToggleMining={toggleMining}

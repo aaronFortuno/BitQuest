@@ -287,6 +287,6 @@ La UI renderitza amb les noves props.
 - [x] Pas 3: Propagacio per graf (BFS amb delays)
 - [x] Pas 4: Interficie alumne (reescriptura)
 - [x] Pas 5: Interficie professor (reescriptura seccio fase 5)
-- [ ] Pas 6: Hook i router
+- [x] Pas 6: Hook i router
 - [ ] Pas 7: Polish i animacions
 - [ ] Pas 8: Traduccions i instruccions
