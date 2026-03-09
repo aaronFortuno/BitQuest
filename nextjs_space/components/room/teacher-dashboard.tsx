@@ -32,6 +32,7 @@ import { type RSAKeyPair, type KeyGenSteps } from '@/lib/crypto';
 import Phase3CryptoPanel from './phase3-crypto-panel';
 import Phase4UtxoPanel from './phase4-utxo-panel';
 import Phase3UserInterface from './phase3-user-interface';
+import Phase5TeacherPanel from './phase5-teacher-panel';
 
 interface TeacherDashboardProps {
   room: Room;
@@ -62,6 +63,9 @@ interface TeacherDashboardProps {
   onToggleNodeDisconnection?: (nodeId: string, isDisconnected: boolean) => Promise<void>;
   onFillMempool?: (count?: number) => Promise<void>;
   onInitializeNetwork?: (regenerate?: boolean) => Promise<void>;
+  onCreateTeacherTransaction?: (originNodeId: string) => Promise<void>;
+  onDestroyConnection?: (connectionId: string) => Promise<void>;
+  onToggleStudentSending?: (enabled: boolean) => Promise<void>;
   // Phase 6 & 7
   onCreatePendingBlock?: () => Promise<Block | null>;
   onResetBlockchain?: () => Promise<void>;
@@ -110,6 +114,9 @@ export default function TeacherDashboard({
   onToggleNodeDisconnection,
   onFillMempool,
   onInitializeNetwork,
+  onCreateTeacherTransaction,
+  onDestroyConnection,
+  onToggleStudentSending,
   onCreatePendingBlock,
   onResetBlockchain,
   onToggleMining,
@@ -1305,101 +1312,20 @@ export default function TeacherDashboard({
         </div>
       )}
 
-      {/* Phase 5 Mempool & Network Control Panel */}
+      {/* Phase 5 Network & Mempool Control Panel */}
       {currentPhase === 5 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="zone-card phase-panel-purple"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-purple-600" />
-              <h2 className="font-semibold text-heading">{t('phase5InstructionTitle')}</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase5.activeNodes')}</p>
-              <p className="font-semibold text-purple-600 text-xl">{students.filter(s => !s.isNodeDisconnected).length}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase5.connections')}</p>
-              <p className="font-semibold text-blue-600 text-xl">{nodeConnections.filter(c => c.isActive).length}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('mempoolTransactions')}</p>
-              <p className="font-semibold text-indigo-600 text-xl">{mempoolTransactions.filter(tx => tx.status === 'in_mempool').length}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('disconnectedNodes')}</p>
-              <p className="font-semibold text-red-600 text-xl">{students.filter(s => s.isNodeDisconnected).length}</p>
-            </div>
-          </div>
-
-          {/* Demo controls */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button
-              onClick={() => onInitializeNetwork?.(true)}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
-            >
-              {t('phase5.initializeNetwork')}
-            </button>
-            <button
-              onClick={() => onFillMempool?.(10)}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors"
-            >
-              {t('fillMempool')}
-            </button>
-          </div>
-
-          {/* Node Status with disconnect controls */}
-          <div className="mt-4">
-            <h3 className="font-medium text-body mb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-purple-500" />
-              {t('studentActivity')} - {t('disconnectNode')}
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {students.map((student) => {
-                const isDisconnected = student.isNodeDisconnected || false;
-                const receivedTxs = mempoolTransactions.filter(tx => 
-                  tx.propagatedTo?.includes(student.id)
-                ).length;
-                return (
-                  <div 
-                    key={student.id} 
-                    className={`p-2 rounded-lg cursor-pointer transition-colors ${
-                      isDisconnected 
-                        ? 'bg-red-100 border border-red-300' 
-                        : 'bg-surface hover:bg-gray-50 dark:hover:bg-zinc-700'
-                    }`}
-                    onClick={() => onToggleNodeDisconnection?.(student.id, !isDisconnected)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-body truncate">{student.name}</p>
-                      {isDisconnected ? (
-                        <Unplug className="w-4 h-4 text-red-500" />
-                      ) : (
-                        <Plug className="w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                    <p className="text-xs text-faint">
-                      {receivedTxs} {t('phase5.receivedTransactions').toLowerCase()}
-                    </p>
-                    <p className="text-xs mt-1">
-                      {isDisconnected ? (
-                        <span className="text-red-500">{t('reconnectNode')}</span>
-                      ) : (
-                        <span className="text-faint">{t('disconnectNode')}</span>
-                      )}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </motion.div>
+        <Phase5TeacherPanel
+          room={room}
+          students={students}
+          mempoolTransactions={mempoolTransactions}
+          nodeConnections={nodeConnections}
+          onInitializeNetwork={onInitializeNetwork}
+          onToggleNodeDisconnection={onToggleNodeDisconnection}
+          onCreateTeacherTransaction={onCreateTeacherTransaction}
+          onDestroyConnection={onDestroyConnection}
+          onToggleStudentSending={onToggleStudentSending}
+          t={t}
+        />
       )}
 
       {/* Phase 6 Mining Control Panel */}
