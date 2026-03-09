@@ -288,5 +288,33 @@ La UI renderitza amb les noves props.
 - [x] Pas 4: Interficie alumne (reescriptura)
 - [x] Pas 5: Interficie professor (reescriptura seccio fase 5)
 - [x] Pas 6: Hook i router
-- [x] Pas 7: Polish i animacions (pulsos de propagació + flash nodes)
+- [~] Pas 7: Polish i animacions — EN REVISIÓ (veure notes sota)
 - [ ] Pas 8: Traduccions i instruccions
+
+---
+
+## Notes de revisió Pas 7 (sessió 2025-03-09)
+
+### Fet i funcionant
+- Polsos de llum viatjant al llarg de les línies de connexió (rAF, ease-out)
+- Cascada BFS: A→B primer, després B→C amb delay escalonat
+- Flash de node receptor (glow + anell expansiu progressiu, rAF)
+- Línia groga estàtica eliminada — només el punt de llum viatja
+- Mempool local ordenada per temps d'arribada (no per createdAt del servidor)
+- Propagació servidor: 3-5s per salt, polling 2.5s
+
+### Pendent de polir (feedback de l'usuari)
+L'usuari va dir "es veu molt millor" però queden coses per polir.
+Punts a revisar en la propera sessió:
+- **Revisar el comportament visual** dels polsos i flashes en detall
+- **Testejar amb més nodes** (10-30) per veure si escala bé
+- **Animació de reconnexió** quan es destrueix una connexió
+- **Responsivitat** mòbil/tablet
+- **Qualsevol feedback addicional** que doni l'usuari
+
+### Commits d'aquesta sessió
+| Commit | Descripció |
+|--------|------------|
+| `a575493` | Pas 7: Polsos SMIL (primer intent, no funcionava) |
+| `a0a4948` | Fix: línia groga, cascada BFS, flash suau, delay 3-5s |
+| `9c46d40` | Fix definitiu: rAF en lloc de SMIL + mempool local |
