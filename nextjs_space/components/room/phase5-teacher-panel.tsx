@@ -179,9 +179,9 @@ export default function Phase5TeacherPanel({
     return edges;
   }, [mempoolTransactions, nodeConnections]);
 
-  // Force layout
-  const svgWidth = 600;
-  const svgHeight = 360;
+  // Force layout — use a larger internal canvas so nodes spread out
+  const layoutWidth = 1200;
+  const layoutHeight = 800;
 
   const layoutPositions = useMemo(() => {
     const nodes = students.map(s => ({
@@ -192,8 +192,78 @@ export default function Phase5TeacherPanel({
     const edges = nodeConnections
       .filter(c => c.isActive)
       .map(c => ({ id: c.id, a: c.nodeAId, b: c.nodeBId }));
-    return computeForceLayout(nodes, edges, svgWidth, svgHeight);
+    return computeForceLayout(nodes, edges, layoutWidth, layoutHeight);
   }, [students, nodeConnections]);
+
+  // Compute a viewBox that fits all nodes with padding
+  const fittedViewBox = useMemo(() => {
+    if (layoutPositions.size === 0) return `0 0 ${layoutWidth} ${layoutHeight}`;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const pos of layoutPositions.values()) {
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxX = Math.max(maxX, pos.x);
+      maxY = Math.max(maxY, pos.y);
+    }
+    const pad = 60; // padding around nodes
+    return `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`;
+  }, [layoutPositions]);
+
+  // Pan & zoom state
+  const svgContainerRef = useRef<HTMLDivElement>(null);
+  const [viewBox, setViewBox] = useState(fittedViewBox);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0, vb: { x: 0, y: 0, w: 0, h: 0 } });
+
+  // Reset viewBox when layout changes
+  useEffect(() => {
+    setViewBox(fittedViewBox);
+  }, [fittedViewBox]);
+
+  const parseViewBox = (vb: string) => {
+    const [x, y, w, h] = vb.split(' ').map(Number);
+    return { x, y, w, h };
+  };
+
+  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.15 : 0.87; // zoom out / zoom in
+    setViewBox(prev => {
+      const vb = parseViewBox(prev);
+      const newW = vb.w * factor;
+      const newH = vb.h * factor;
+      // Zoom toward center
+      const newX = vb.x - (newW - vb.w) / 2;
+      const newY = vb.y - (newH - vb.h) / 2;
+      return `${newX} ${newY} ${newW} ${newH}`;
+    });
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    // Only start pan on middle-click or if clicking on background (not a node/edge)
+    const target = e.target as SVGElement;
+    if (target.tagName !== 'svg' && target.tagName !== 'rect') return;
+    setIsPanning(true);
+    const vb = parseViewBox(viewBox);
+    panStart.current = { x: e.clientX, y: e.clientY, vb };
+    (e.target as SVGElement).setPointerCapture(e.pointerId);
+  }, [viewBox]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (!isPanning) return;
+    const svg = e.currentTarget;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const scale = ctm.a; // pixels per SVG unit
+    const dx = (e.clientX - panStart.current.x) / scale;
+    const dy = (e.clientY - panStart.current.y) / scale;
+    const { vb } = panStart.current;
+    setViewBox(`${vb.x - dx} ${vb.y - dy} ${vb.w} ${vb.h}`);
+  }, [isPanning]);
+
+  const handlePointerUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
 
   // Auto-dismiss feedback
   useEffect(() => {
@@ -337,12 +407,22 @@ export default function Phase5TeacherPanel({
           <p className="mb-3">{t('phase5.networkNotInitialized')}</p>
         </div>
       ) : (
-        <div className="bg-gray-100 dark:bg-zinc-800/50 rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-700">
+        <div
+          ref={svgContainerRef}
+          className="bg-gray-100 dark:bg-zinc-800/50 rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-700"
+        >
           <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            viewBox={viewBox}
             className="w-full"
-            style={{ maxHeight: '400px' }}
+            style={{ height: '55vh', minHeight: '350px', cursor: isPanning ? 'grabbing' : 'grab' }}
+            onWheel={handleWheel}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
           >
+            {/* Background rect for pan events */}
+            <rect x={-9999} y={-9999} width={99999} height={99999} fill="transparent" />
             {/* Connection lines */}
             {nodeConnections.filter(c => c.isActive).map(conn => {
               const posA = layoutPositions.get(conn.nodeAId);
@@ -361,7 +441,7 @@ export default function Phase5TeacherPanel({
                       x1={posA.x} y1={posA.y}
                       x2={posB.x} y2={posB.y}
                       stroke="transparent"
-                      strokeWidth={14}
+                      strokeWidth={20}
                       className="cursor-pointer"
                       onClick={() => handleEdgeClick(conn.id)}
                     />
@@ -375,7 +455,7 @@ export default function Phase5TeacherPanel({
                         : isDisconnectMode ? '#f87171'
                         : '#6b7280'
                     }
-                    strokeWidth={isPropagating ? 3 : 2}
+                    strokeWidth={isPropagating ? 4 : 2.5}
                     strokeLinecap="round"
                     opacity={isDisconnectMode && !isPropagating ? 0.7 : 1}
                     className={isDisconnectMode ? 'cursor-pointer' : ''}
@@ -387,7 +467,7 @@ export default function Phase5TeacherPanel({
                       x1={posA.x} y1={posA.y}
                       x2={posB.x} y2={posB.y}
                       stroke="#facc15"
-                      strokeWidth={7}
+                      strokeWidth={10}
                       strokeLinecap="round"
                       opacity={0.25}
                     >
@@ -421,14 +501,14 @@ export default function Phase5TeacherPanel({
                   {/* Node circle */}
                   <circle
                     cx={pos.x} cy={pos.y}
-                    r={20}
+                    r={30}
                     fill={isDisconnected ? '#7f1d1d' : '#1e3a5f'}
                     stroke={
                       isDisconnected ? '#ef4444'
                         : mode === 'disconnect' ? '#f87171'
                         : '#3b82f6'
                     }
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     opacity={isDisconnected ? 0.6 : 1}
                   />
                   {/* Name */}
@@ -437,35 +517,35 @@ export default function Phase5TeacherPanel({
                     textAnchor="middle"
                     dominantBaseline="middle"
                     fill={isDisconnected ? '#fca5a5' : 'white'}
-                    fontSize="9"
+                    fontSize="13"
                     fontWeight="600"
                   >
-                    {student.name.length > 8 ? student.name.slice(0, 7) + '..' : student.name}
+                    {student.name.length > 9 ? student.name.slice(0, 8) + '..' : student.name}
                   </text>
                   {/* TX count badge */}
                   {txCount > 0 && !isDisconnected && (
                     <>
-                      <circle cx={pos.x + 15} cy={pos.y - 15} r={8} fill="#7c3aed" />
+                      <circle cx={pos.x + 22} cy={pos.y - 22} r={11} fill="#7c3aed" />
                       <text
-                        x={pos.x + 15} y={pos.y - 14}
+                        x={pos.x + 22} y={pos.y - 21}
                         textAnchor="middle"
                         dominantBaseline="middle"
                         fill="white"
-                        fontSize="8"
+                        fontSize="10"
                         fontWeight="bold"
                       >
                         {txCount > 9 ? '9+' : txCount}
                       </text>
                     </>
                   )}
-                  {/* Disconnected icon */}
+                  {/* Disconnected label */}
                   {isDisconnected && (
                     <text
-                      x={pos.x} y={pos.y + 9}
+                      x={pos.x} y={pos.y + 13}
                       textAnchor="middle"
                       dominantBaseline="middle"
                       fill="#fca5a5"
-                      fontSize="7"
+                      fontSize="10"
                     >
                       {t('phase5.disconnectedLabel')}
                     </text>
