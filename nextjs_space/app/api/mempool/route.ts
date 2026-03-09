@@ -140,7 +140,7 @@ async function simulateGraphPropagation(txId: string, roomId: string, originNode
 
     while (currentWave.length > 0) {
       // Delay before this wave propagates (simulates network latency)
-      const delay = 1500 + Math.random() * 1500; // 1.5-3s
+      const delay = 3000 + Math.random() * 2000; // 3-5s per hop
       await new Promise(resolve => setTimeout(resolve, delay));
 
       const nextWave: string[] = [];

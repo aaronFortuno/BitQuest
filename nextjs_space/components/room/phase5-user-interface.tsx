@@ -45,14 +45,12 @@ function MiniNodeGraph({
   participant,
   myNeighbors,
   nodeConnections,
-  propagatingEdges,
   pulses,
   flashes,
 }: {
   participant: Participant;
   myNeighbors: Participant[];
   nodeConnections: NodeConnection[];
-  propagatingEdges: Set<string>;
   pulses: { id: string; fromId: string; toId: string }[];
   flashes: { nodeId: string; time: number }[];
 }) {
@@ -105,14 +103,13 @@ function MiniNodeGraph({
       {myConnectionIds.map(({ peerId, key }) => {
         const nPos = neighborPositions.find(n => n.id === peerId);
         if (!nPos) return null;
-        const isPropagating = propagatingEdges.has(key);
         return (
           <g key={key}>
             <line
               x1={cx} y1={cy}
               x2={nPos.x} y2={nPos.y}
-              stroke={isPropagating ? '#facc15' : 'rgba(99, 130, 206, 0.4)'}
-              strokeWidth={isPropagating ? 3 : 2}
+              stroke="rgba(99, 130, 206, 0.4)"
+              strokeWidth={2}
               strokeLinecap="round"
             />
           </g>
@@ -217,7 +214,7 @@ function MiniNodeGraph({
         );
       })}
 
-      {/* ─── Node flash rings ─── */}
+      {/* ─── Node flash (glow + expanding ring) ─── */}
       {flashes.map(flash => {
         const isMe = flash.nodeId === participant.id;
         const pos = isMe ? { x: cx, y: cy }
@@ -225,19 +222,17 @@ function MiniNodeGraph({
         const r = isMe ? 28 : 22;
         if (!pos) return null;
         return (
-          <circle
-            key={`flash-${flash.nodeId}-${flash.time}`}
-            cx={pos.x}
-            cy={pos.y}
-            r={r}
-            fill="none"
-            stroke="#facc15"
-            strokeWidth={2.5}
-            opacity={0}
-          >
-            <animate attributeName="r" from={`${r}`} to={`${r + 14}`} dur={`${FLASH_DUR_S}s`} fill="freeze" />
-            <animate attributeName="opacity" values="0;0.8;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
-          </circle>
+          <g key={`flash-${flash.nodeId}-${flash.time}`}>
+            {/* Inner glow overlay */}
+            <circle cx={pos.x} cy={pos.y} r={r} fill="#facc15" opacity={0}>
+              <animate attributeName="opacity" values="0;0.45;0.25;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
+            </circle>
+            {/* Expanding ring */}
+            <circle cx={pos.x} cy={pos.y} r={r} fill="none" stroke="#facc15" strokeWidth={2} opacity={0}>
+              <animate attributeName="r" from={`${r}`} to={`${r + 16}`} dur={`${FLASH_DUR_S}s`} fill="freeze" />
+              <animate attributeName="opacity" values="0;0.6;0.3;0" dur={`${FLASH_DUR_S}s`} fill="freeze" />
+            </circle>
+          </g>
         );
       })}
     </svg>
@@ -294,85 +289,89 @@ export default function Phase5UserInterface({
     [mempoolTransactions, participant.id]
   );
 
-  // Edges currently propagating: a TX is propagating through an edge if
-  // I have it but a neighbor doesn't (or vice versa)
-  const propagatingEdges = useMemo(() => {
-    const edges = new Set<string>();
-    const connKey = (a: string, b: string) => [a, b].sort().join('-');
-    for (const tx of mempoolTransactions) {
-      if (tx.status !== 'propagating') continue;
-      const myHasIt = tx.propagatedTo?.includes(participant.id);
-      for (const neighborId of myNeighborIds) {
-        const neighborHasIt = tx.propagatedTo?.includes(neighborId);
-        if (myHasIt !== neighborHasIt) {
-          edges.add(connKey(participant.id, neighborId));
-        }
-      }
-    }
-    return edges;
-  }, [mempoolTransactions, participant.id, myNeighborIds]);
-
-  // ─── Propagation pulse tracking ───
+  // ─── Propagation pulse tracking (BFS cascade) ───
   const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
   const [activePulses, setActivePulses] = useState<{ id: string; fromId: string; toId: string; createdAt: number }[]>([]);
   const [flashes, setFlashes] = useState<{ nodeId: string; time: number }[]>([]);
 
   useEffect(() => {
     const prevMap = prevPropRef.current;
-    const newPulses: { id: string; fromId: string; toId: string; createdAt: number }[] = [];
     const now = Date.now();
     const myId = participant.id;
+    const relevantIds = new Set([myId, ...myNeighborIds]);
 
     for (const tx of mempoolTransactions) {
       const currentSet = new Set(tx.propagatedTo || []);
       const prevSet = prevMap.get(tx.id) || new Set<string>();
 
-      // Only track nodes relevant to my view (me + my neighbors)
-      const relevantIds = new Set([myId, ...myNeighborIds]);
-
+      // Find newly added relevant nodes
+      const newNodes = new Set<string>();
       for (const nodeId of currentSet) {
-        if (prevSet.has(nodeId)) continue;
-        if (!relevantIds.has(nodeId)) continue;
-
-        // Find source neighbor
-        let sourceId: string | null = null;
-        for (const conn of nodeConnections) {
-          if (!conn.isActive) continue;
-          const nId = conn.nodeAId === nodeId ? conn.nodeBId
-                    : conn.nodeBId === nodeId ? conn.nodeAId : null;
-          if (!nId) continue;
-          if (prevSet.has(nId) && relevantIds.has(nId)) { sourceId = nId; break; }
-        }
-        if (!sourceId) {
-          for (const conn of nodeConnections) {
-            if (!conn.isActive) continue;
-            const nId = conn.nodeAId === nodeId ? conn.nodeBId
-                      : conn.nodeBId === nodeId ? conn.nodeAId : null;
-            if (!nId) continue;
-            if (currentSet.has(nId) && nId !== nodeId && relevantIds.has(nId)) { sourceId = nId; break; }
-          }
-        }
-
-        if (sourceId) {
-          newPulses.push({ id: `p-${tx.id}-${sourceId}-${nodeId}-${now}`, fromId: sourceId, toId: nodeId, createdAt: now });
-        }
+        if (!prevSet.has(nodeId) && relevantIds.has(nodeId)) newNodes.add(nodeId);
       }
-      prevMap.set(tx.id, currentSet);
-    }
 
-    if (newPulses.length > 0) {
-      setActivePulses(prev => [...prev, ...newPulses]);
-      const flashTime = now;
-      setTimeout(() => {
-        const newFlashes = newPulses.map(p => ({ nodeId: p.toId, time: flashTime }));
-        setFlashes(prev => [...prev, ...newFlashes]);
-        setTimeout(() => {
-          setFlashes(prev => prev.filter(f => f.time !== flashTime));
-        }, FLASH_DUR_S * 1000 + 100);
-      }, PULSE_DUR_S * 1000);
-      setTimeout(() => {
-        setActivePulses(prev => prev.filter(p => p.createdAt !== now));
-      }, PULSE_DUR_S * 1000 + 300);
+      if (newNodes.size > 0) {
+        // BFS from prev frontier to reconstruct cascade
+        const visited = new Set<string>();
+        for (const id of prevSet) { if (relevantIds.has(id)) visited.add(id); }
+        // Also include non-relevant prev nodes as "already visited" to find correct sources
+        for (const id of prevSet) visited.add(id);
+
+        let bfsFrontier = [...prevSet].filter(id => relevantIds.has(id) || prevSet.has(id));
+        const layers: { fromId: string; toId: string }[][] = [];
+
+        while (bfsFrontier.length > 0) {
+          const layerPulses: { fromId: string; toId: string }[] = [];
+          const nextFrontier: string[] = [];
+
+          for (const sourceId of bfsFrontier) {
+            for (const conn of nodeConnections) {
+              if (!conn.isActive) continue;
+              const nId = conn.nodeAId === sourceId ? conn.nodeBId
+                        : conn.nodeBId === sourceId ? conn.nodeAId : null;
+              if (!nId || visited.has(nId) || !currentSet.has(nId)) continue;
+              visited.add(nId);
+              nextFrontier.push(nId);
+              // Only create visual pulse if both ends are relevant (visible)
+              if (relevantIds.has(sourceId) && relevantIds.has(nId)) {
+                layerPulses.push({ fromId: sourceId, toId: nId });
+              }
+            }
+          }
+
+          if (layerPulses.length > 0) layers.push(layerPulses);
+          bfsFrontier = nextFrontier;
+        }
+
+        // Schedule each layer with staggered timing
+        layers.forEach((layer, layerIdx) => {
+          const delay = layerIdx * PULSE_DUR_S * 1000;
+          const pulses = layer.map((p, i) => ({
+            id: `p-${tx.id}-${p.fromId}-${p.toId}-${now}-L${layerIdx}-${i}`,
+            fromId: p.fromId,
+            toId: p.toId,
+            createdAt: now + layerIdx,
+          }));
+
+          setTimeout(() => {
+            setActivePulses(prev => [...prev, ...pulses]);
+            setTimeout(() => {
+              const flashTime = Date.now();
+              const newFlashes = pulses.map(p => ({ nodeId: p.toId, time: flashTime }));
+              setFlashes(prev => [...prev, ...newFlashes]);
+              setTimeout(() => {
+                setFlashes(prev => prev.filter(f => f.time !== flashTime));
+              }, FLASH_DUR_S * 1000 + 200);
+            }, PULSE_DUR_S * 1000);
+            setTimeout(() => {
+              const ids = new Set(pulses.map(p => p.id));
+              setActivePulses(prev => prev.filter(p => !ids.has(p.id)));
+            }, PULSE_DUR_S * 1000 + 400);
+          }, delay);
+        });
+      }
+
+      prevMap.set(tx.id, currentSet);
     }
   }, [mempoolTransactions, nodeConnections, participant.id, myNeighborIds]);
 
@@ -459,7 +458,6 @@ export default function Phase5UserInterface({
               participant={participant}
               myNeighbors={myNeighbors}
               nodeConnections={nodeConnections}
-              propagatingEdges={propagatingEdges}
               pulses={activePulses}
               flashes={flashes}
             />

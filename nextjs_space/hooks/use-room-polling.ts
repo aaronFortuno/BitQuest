@@ -682,7 +682,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     const mempoolPoll = setInterval(() => {
       fetchMempoolTransactions();
       fetchNodeConnections();
-    }, 5000);
+    }, 2500); // Fast polling to see propagation wave by wave
 
     return () => clearInterval(mempoolPoll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
