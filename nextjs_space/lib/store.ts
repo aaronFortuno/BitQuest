@@ -582,6 +582,36 @@ export const store = {
     return items.map(item => this.createNodeConnection(roomId, item));
   },
 
+  deactivateNodeConnection(connectionId: string, roomId: string): NodeConnectionData | undefined {
+    const state = getRoomStateById(roomId);
+    if (!state) return undefined;
+    const conn = state.nodeConnections.get(connectionId);
+    if (conn) {
+      conn.isActive = false;
+    }
+    return conn;
+  },
+
+  getNodeConnectionById(connectionId: string, roomId: string): NodeConnectionData | undefined {
+    const state = getRoomStateById(roomId);
+    if (!state) return undefined;
+    return state.nodeConnections.get(connectionId);
+  },
+
+  getActiveConnectionsForNode(nodeId: string, roomId: string): NodeConnectionData[] {
+    const state = getRoomStateById(roomId);
+    if (!state) return [];
+    return Array.from(state.nodeConnections.values()).filter(
+      c => c.isActive && (c.nodeAId === nodeId || c.nodeBId === nodeId)
+    );
+  },
+
+  getConnectedNodeIds(nodeId: string, roomId: string): string[] {
+    return this.getActiveConnectionsForNode(nodeId, roomId).map(c =>
+      c.nodeAId === nodeId ? c.nodeBId : c.nodeAId
+    );
+  },
+
   // ---- Block ----
   createBlock(roomId: string, data: Partial<BlockData>): BlockData {
     const state = getRoomStateById(roomId);

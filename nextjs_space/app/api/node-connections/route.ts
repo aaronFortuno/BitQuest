@@ -3,7 +3,7 @@ import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
 
-// GET: Fetch all node connections for a room
+// GET: Fetch all active node connections for a room
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST: Initialize or refresh network connections for a room
+// New topology: each node gets exactly 2-3 connections, graph is connected
 export async function POST(request: NextRequest) {
   try {
     const { roomId, regenerate = false } = await request.json();
@@ -62,35 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Create a mesh network topology
-    const connectionSet = new Set<string>();
-    const connectionsData: { nodeAId: string; nodeBId: string }[] = [];
-
-    const addConnection = (a: string, b: string) => {
-      const key = [a, b].sort().join('-');
-      if (!connectionSet.has(key) && a !== b) {
-        connectionSet.add(key);
-        connectionsData.push({ nodeAId: a, nodeBId: b });
-      }
-    };
-
-    // First, create a basic ring
-    for (let i = 0; i < participants.length; i++) {
-      const nextIdx = (i + 1) % participants.length;
-      addConnection(participants[i].id, participants[nextIdx].id);
-    }
-
-    // Add some random cross-connections
-    const numExtraConnections = Math.min(
-      Math.floor(participants.length * 1.5),
-      participants.length * (participants.length - 1) / 2 - participants.length
-    );
-
-    for (let i = 0; i < numExtraConnections; i++) {
-      const a = participants[Math.floor(Math.random() * participants.length)];
-      const b = participants[Math.floor(Math.random() * participants.length)];
-      addConnection(a.id, b.id);
-    }
+    const connectionsData = buildConstrainedTopology(participants.map(p => p.id));
 
     // Create connections in store
     store.createManyNodeConnections(roomId, connectionsData.map(c => ({
@@ -110,4 +83,180 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// DELETE: Destroy a specific connection between two nodes
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const connectionId = searchParams.get('connectionId');
+    const roomId = searchParams.get('roomId');
+
+    if (!connectionId || !roomId) {
+      return NextResponse.json(
+        { error: 'connectionId and roomId are required' },
+        { status: 400 }
+      );
+    }
+
+    const conn = store.deactivateNodeConnection(connectionId, roomId);
+    if (!conn) {
+      return NextResponse.json(
+        { error: 'Connection not found' },
+        { status: 404 }
+      );
+    }
+
+    // Trigger auto-reconnection for affected nodes
+    const affectedNodes = [conn.nodeAId, conn.nodeBId];
+    const reconnections = [];
+
+    for (const nodeId of affectedNodes) {
+      const currentConns = store.getActiveConnectionsForNode(nodeId, roomId);
+      // If a node has fewer than 2 connections, try to reconnect
+      if (currentConns.length < 2) {
+        const newConn = findReconnection(nodeId, roomId);
+        if (newConn) {
+          reconnections.push(newConn);
+        }
+      }
+    }
+
+    const roomCode = store.getRoomCodeById(roomId);
+    if (roomCode) broadcastRoomUpdate(roomCode);
+
+    return NextResponse.json({
+      deactivated: conn,
+      reconnections,
+    });
+  } catch (error) {
+    console.error('Error destroying connection:', error);
+    return NextResponse.json(
+      { error: 'Failed to destroy connection' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH: Trigger manual reconnection for a specific node
+export async function PATCH(request: NextRequest) {
+  try {
+    const { nodeId, roomId } = await request.json();
+
+    if (!nodeId || !roomId) {
+      return NextResponse.json(
+        { error: 'nodeId and roomId are required' },
+        { status: 400 }
+      );
+    }
+
+    const newConn = findReconnection(nodeId, roomId);
+
+    const roomCode = store.getRoomCodeById(roomId);
+    if (roomCode) broadcastRoomUpdate(roomCode);
+
+    return NextResponse.json({ reconnection: newConn || null });
+  } catch (error) {
+    console.error('Error reconnecting node:', error);
+    return NextResponse.json(
+      { error: 'Failed to reconnect node' },
+      { status: 500 }
+    );
+  }
+}
+
+
+// ─── Topology builder: 2-3 connections per node, connected graph ───
+
+function buildConstrainedTopology(nodeIds: string[]): { nodeAId: string; nodeBId: string }[] {
+  const n = nodeIds.length;
+  if (n < 2) return [];
+  if (n === 2) return [{ nodeAId: nodeIds[0], nodeBId: nodeIds[1] }];
+
+  const connectionSet = new Set<string>();
+  const connections: { nodeAId: string; nodeBId: string }[] = [];
+  const degree = new Map<string, number>();
+  nodeIds.forEach(id => degree.set(id, 0));
+
+  const connKey = (a: string, b: string) => [a, b].sort().join('-');
+
+  const addConnection = (a: string, b: string): boolean => {
+    const key = connKey(a, b);
+    if (connectionSet.has(key) || a === b) return false;
+    if ((degree.get(a) || 0) >= 3 || (degree.get(b) || 0) >= 3) return false;
+    connectionSet.add(key);
+    connections.push({ nodeAId: a, nodeBId: b });
+    degree.set(a, (degree.get(a) || 0) + 1);
+    degree.set(b, (degree.get(b) || 0) + 1);
+    return true;
+  };
+
+  // Step 1: Shuffle nodes and create a spanning path (guarantees connected graph)
+  const shuffled = [...nodeIds].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < shuffled.length - 1; i++) {
+    addConnection(shuffled[i], shuffled[i + 1]);
+  }
+
+  // Step 2: Add extra connections to bring every node to at least 2 connections
+  // (the path endpoints only have 1 connection so far)
+  for (const nodeId of shuffled) {
+    while ((degree.get(nodeId) || 0) < 2) {
+      // Find candidate nodes: not already connected, degree < 3
+      const currentNeighbors = new Set<string>();
+      for (const c of connections) {
+        if (c.nodeAId === nodeId) currentNeighbors.add(c.nodeBId);
+        if (c.nodeBId === nodeId) currentNeighbors.add(c.nodeAId);
+      }
+
+      const candidates = nodeIds.filter(
+        id => id !== nodeId && !currentNeighbors.has(id) && (degree.get(id) || 0) < 3
+      );
+
+      if (candidates.length === 0) break; // no viable candidates
+      const target = candidates[Math.floor(Math.random() * candidates.length)];
+      addConnection(nodeId, target);
+    }
+  }
+
+  return connections;
+}
+
+
+// ─── Auto-reconnection: find a new peer for a node that lost a connection ───
+
+function findReconnection(nodeId: string, roomId: string) {
+  const currentNeighborIds = new Set(store.getConnectedNodeIds(nodeId, roomId));
+
+  // Get all active, non-disconnected participants
+  const participants = store.getParticipantsByRoom(roomId)
+    .filter(p => p.isActive && p.role === 'student' && !p.isNodeDisconnected);
+
+  // Find candidates: not already a neighbor, not self, degree < 3
+  const candidates = participants.filter(p => {
+    if (p.id === nodeId) return false;
+    if (currentNeighborIds.has(p.id)) return false;
+    const theirConns = store.getActiveConnectionsForNode(p.id, roomId);
+    return theirConns.length < 3;
+  });
+
+  if (candidates.length === 0) {
+    // Fallback: allow connecting to any node not already a neighbor (even if degree >= 3)
+    const fallback = participants.filter(p =>
+      p.id !== nodeId && !currentNeighborIds.has(p.id)
+    );
+    if (fallback.length === 0) return null;
+    const target = fallback[Math.floor(Math.random() * fallback.length)];
+    return store.createNodeConnection(roomId, {
+      nodeAId: nodeId,
+      nodeBId: target.id,
+      isActive: true,
+    });
+  }
+
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  return store.createNodeConnection(roomId, {
+    nodeAId: nodeId,
+    nodeBId: target.id,
+    isActive: true,
+  });
 }
