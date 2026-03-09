@@ -282,8 +282,9 @@ export default function RoomPage() {
           participant={currentParticipant!}
           mempoolTransactions={mempoolTransactions}
           nodeConnections={nodeConnections}
-          onCreateTransaction={createMempoolTransaction}
-          onInitializeNetwork={initializeNetwork}
+          onCreateTransaction={(receiverId: string, amount: number) =>
+            createMempoolTransaction(receiverId, amount, 0)
+          }
         />
       );
     }

@@ -285,7 +285,7 @@ La UI renderitza amb les noves props.
 - [x] Pas 1: Camp `studentSendingEnabled` (commit: veure git log)
 - [x] Pas 2: Topologia de xarxa (2-3 connexions per node)
 - [x] Pas 3: Propagacio per graf (BFS amb delays)
-- [ ] Pas 4: Interficie alumne (reescriptura)
+- [x] Pas 4: Interficie alumne (reescriptura)
 - [ ] Pas 5: Interficie professor (reescriptura seccio fase 5)
 - [ ] Pas 6: Hook i router
 - [ ] Pas 7: Polish i animacions
