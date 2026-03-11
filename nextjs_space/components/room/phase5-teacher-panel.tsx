@@ -292,7 +292,9 @@ export default function Phase5TeacherPanel({
   // Cleanup rAF on unmount
   useEffect(() => () => cancelAnimationFrame(rAFRef.current), []);
 
-  // Read propagationEdges from server and create pulses with exact timestamps
+  // Read propagationEdges from server and create pulses with exact timestamps.
+  // If we detect edges late (e.g. polling delay), shift all times forward
+  // so the cascade is still visible from the earliest unseen edge.
   useEffect(() => {
     const seen = seenEdgesRef.current;
     let hasNew = false;
@@ -302,9 +304,17 @@ export default function Phase5TeacherPanel({
       if (!edges || edges.length === 0) continue;
       const color = tx.propagationColor || '#facc15';
 
-      for (const edge of edges) {
+      // Find unseen edges for this TX
+      const unseenEdges = edges.filter(e => !seen.has(`${tx.id}-${e.fromNodeId}-${e.toNodeId}`));
+      if (unseenEdges.length === 0) continue;
+
+      // If the earliest edge is already past, shift all forward so we still see the cascade
+      const now = Date.now();
+      const earliestStart = Math.min(...unseenEdges.map(e => e.startTime));
+      const timeOffset = now > earliestStart ? now - earliestStart : 0;
+
+      for (const edge of unseenEdges) {
         const edgeKey = `${tx.id}-${edge.fromNodeId}-${edge.toNodeId}`;
-        if (seen.has(edgeKey)) continue;
         seen.add(edgeKey);
 
         const from = layoutPositions.get(edge.fromNodeId);
@@ -316,7 +326,7 @@ export default function Phase5TeacherPanel({
           fromX: from.x, fromY: from.y,
           toX: to.x, toY: to.y,
           toNodeId: edge.toNodeId,
-          startTime: edge.startTime,
+          startTime: edge.startTime + timeOffset,
           duration: edge.duration,
           color, redundant: edge.redundant || false,
         });

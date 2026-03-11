@@ -336,7 +336,8 @@ export default function Phase5UserInterface({
 
   useEffect(() => () => cancelAnimationFrame(rAFRef.current), []);
 
-  // Read propagationEdges from server — only show pulses for edges visible in my mini graph
+  // Read propagationEdges from server — only show pulses for edges visible in my mini graph.
+  // If detected late (polling delay), shift times forward to preserve cascade.
   useEffect(() => {
     const seen = seenEdgesRef.current;
     const relevantIds = new Set([participant.id, ...myNeighborIds]);
@@ -347,9 +348,16 @@ export default function Phase5UserInterface({
       if (!edges || edges.length === 0) continue;
       const color = tx.propagationColor || '#facc15';
 
-      for (const edge of edges) {
+      // Find unseen edges for this TX
+      const unseenEdges = edges.filter(e => !seen.has(`${tx.id}-${e.fromNodeId}-${e.toNodeId}`));
+      if (unseenEdges.length === 0) continue;
+
+      const now = Date.now();
+      const earliestStart = Math.min(...unseenEdges.map(e => e.startTime));
+      const timeOffset = now > earliestStart ? now - earliestStart : 0;
+
+      for (const edge of unseenEdges) {
         const edgeKey = `${tx.id}-${edge.fromNodeId}-${edge.toNodeId}`;
-        if (seen.has(edgeKey)) continue;
         seen.add(edgeKey);
 
         // Only create visible pulse if both ends are in my view
@@ -364,7 +372,7 @@ export default function Phase5UserInterface({
           fromX: from.x, fromY: from.y,
           toX: to.x, toY: to.y,
           toNodeId: edge.toNodeId,
-          startTime: edge.startTime,
+          startTime: edge.startTime + timeOffset,
           duration: edge.duration,
           color, redundant: edge.redundant || false,
         });
