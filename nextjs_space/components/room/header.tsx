@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { Coins, Users, LogOut, Menu, Activity, BookOpen, RotateCcw, ArrowRight } from 'lucide-react';
+import { Coins, Users, LogOut, Menu, Activity, BookOpen, RotateCcw, ArrowRight, Pickaxe } from 'lucide-react';
 import { Room } from '@/lib/types';
 import LanguageSelector from '@/components/ui/language-selector';
 import ThemeToggle from '@/components/ui/theme-toggle';
@@ -10,6 +10,8 @@ interface HeaderProps {
   room: Room;
   isTeacher: boolean;
   studentBalance?: number | null;
+  currentPhase?: number;
+  miningReward?: number;
   onLeave: () => void;
   onToggleNavigation: () => void;
   onToggleInstructions?: () => void;
@@ -21,6 +23,8 @@ export default function Header({
   room,
   isTeacher,
   studentBalance,
+  currentPhase = 0,
+  miningReward,
   onLeave,
   onToggleNavigation,
   onToggleInstructions,
@@ -105,7 +109,12 @@ export default function Header({
 
           {/* Right: Stats & Controls */}
           <div className="flex items-center gap-3">
-            {!isTeacher && studentBalance != null && (
+            {!isTeacher && currentPhase >= 6 && miningReward != null ? (
+              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                <Pickaxe className="w-3.5 h-3.5" />
+                {miningReward} BTC
+              </span>
+            ) : !isTeacher && studentBalance != null && (
               <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                 studentBalance >= 0
                   ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'

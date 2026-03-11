@@ -995,6 +995,32 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, participantId, fetchBlocks, fetchRoom]);
 
+  // Phase 6: Create genesis block (teacher only)
+  const createGenesisBlock = useCallback(async () => {
+    if (!room) return;
+
+    try {
+      const res = await fetch(apiUrl('/api/blocks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create-genesis',
+          roomId: room.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        console.error('Create genesis error:', data.error);
+        return;
+      }
+
+      await fetchBlocks();
+    } catch (err) {
+      console.error('Create genesis error:', err);
+    }
+  }, [room, fetchBlocks]);
+
   // Phase 6: Reset blockchain (teacher only)
   const resetBlockchain = useCallback(async () => {
     if (!room) return;
@@ -1580,6 +1606,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     toggleStudentSending,
     // Phase 6 & 7
     createPendingBlock,
+    createGenesisBlock,
     calculateMiningHash,
     submitMinedBlock,
     resetBlockchain,

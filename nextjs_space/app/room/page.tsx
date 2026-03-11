@@ -107,6 +107,7 @@ export default function RoomPage() {
     halvingInfo,
     economicStats,
     createPendingBlock,
+    createGenesisBlock,
     calculateMiningHash,
     submitMinedBlock,
     resetBlockchain,
@@ -356,6 +357,8 @@ export default function RoomPage() {
         room={room}
         isTeacher={isTeacher}
         studentBalance={studentBalance}
+        currentPhase={currentPhase}
+        miningReward={currentParticipant?.totalMiningReward || 0}
         onLeave={handleLeaveRoom}
         onToggleNavigation={() => setShowNavigation(!showNavigation)}
         onToggleInstructions={isTeacher
@@ -447,6 +450,7 @@ export default function RoomPage() {
             onDestroyConnection={destroyConnection}
             onToggleStudentSending={toggleStudentSending}
             onCreatePendingBlock={createPendingBlock}
+            onCreateGenesisBlock={createGenesisBlock}
             onResetBlockchain={resetBlockchain}
             onToggleMining={toggleMining}
             onForceDifficultyAdjustment={forceDifficultyAdjustment}

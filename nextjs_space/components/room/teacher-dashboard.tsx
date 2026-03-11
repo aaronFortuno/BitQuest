@@ -68,6 +68,7 @@ interface TeacherDashboardProps {
   onToggleStudentSending?: (enabled: boolean) => Promise<void>;
   // Phase 6 & 7
   onCreatePendingBlock?: () => Promise<Block | null>;
+  onCreateGenesisBlock?: () => Promise<void>;
   onResetBlockchain?: () => Promise<void>;
   onToggleMining?: () => Promise<void>;
   onForceDifficultyAdjustment?: (newDifficulty: number) => Promise<{ success: boolean; error?: string }>;
@@ -118,6 +119,7 @@ export default function TeacherDashboard({
   onDestroyConnection,
   onToggleStudentSending,
   onCreatePendingBlock,
+  onCreateGenesisBlock,
   onResetBlockchain,
   onToggleMining,
   onForceDifficultyAdjustment,
@@ -1370,6 +1372,13 @@ export default function TeacherDashboard({
 
           {/* Demo controls */}
           <div className="flex flex-wrap gap-2 mb-4">
+            <button
+              onClick={() => onCreateGenesisBlock?.()}
+              disabled={blocks.length > 0}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+            >
+              {t('phase6.createGenesis')}
+            </button>
             <button
               onClick={() => onCreatePendingBlock?.()}
               className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors"

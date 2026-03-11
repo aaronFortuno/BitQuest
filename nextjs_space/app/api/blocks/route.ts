@@ -290,6 +290,48 @@ export async function POST(request: NextRequest) {
     const room = state.room;
     const roomCode = store.getRoomCodeById(roomId);
 
+    // Action: Create genesis block (teacher only)
+    if (action === 'create-genesis') {
+      const blocks = store.getBlocksByRoom(roomId);
+
+      if (blocks.length > 0) {
+        return NextResponse.json({
+          error: 'Blocks already exist in this room',
+          code: 'BLOCKS_EXIST'
+        }, { status: 400 });
+      }
+
+      const genesisHash = createHash('sha256')
+        .update('1:0000000000000000:[]:0')
+        .digest('hex');
+
+      const genesisBlock = store.createBlock(roomId, {
+        blockNumber: 1,
+        previousHash: '0000000000000000',
+        status: 'mined',
+        difficulty: room.currentDifficulty,
+        reward: 0,
+        transactions: '[]',
+        selectedTxIds: [],
+        totalFees: 0,
+        nonce: 0,
+        hash: genesisHash,
+        minedAt: new Date(),
+      });
+
+      if (roomCode) broadcastRoomUpdate(roomCode);
+      return NextResponse.json({
+        success: true,
+        block: {
+          ...genesisBlock,
+          transactions: [],
+          selectedTxIds: [],
+          totalFees: 0,
+          miner: null
+        }
+      });
+    }
+
     // Action: Create a new pending block
     if (action === 'create-pending') {
       const blocks = store.getBlocksByRoom(roomId);
