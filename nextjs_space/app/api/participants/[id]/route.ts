@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
+// Track pending auto-reconnection timers per node
+const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+const RECONNECT_DELAY_MS = 4000; // 4 seconds before auto-reconnect
 
 // PATCH: Update participant properties (including disconnect status for Phase 5)
 export async function PATCH(
@@ -31,7 +35,42 @@ export async function PATCH(
       );
     }
 
-    const roomCode = store.getRoomCodeById(participant.roomId);
+    const roomId = participant.roomId;
+    const roomCode = store.getRoomCodeById(roomId);
+
+    // ── Node disconnection: deactivate connections + schedule auto-reconnect ──
+    if (sanitizedUpdates.isNodeDisconnected === true) {
+      // Cancel any pending reconnect for this node
+      const existingTimer = reconnectTimers.get(id);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      // Deactivate all connections for this node
+      const connections = store.getActiveConnectionsForNode(id, roomId);
+      for (const conn of connections) {
+        store.deactivateNodeConnection(conn.id, roomId);
+      }
+
+      if (roomCode) broadcastRoomUpdate(roomCode);
+
+      // Schedule auto-reconnection after delay
+      const timer = setTimeout(() => {
+        reconnectTimers.delete(id);
+        autoReconnectNode(id, roomId);
+      }, RECONNECT_DELAY_MS);
+      reconnectTimers.set(id, timer);
+    }
+
+    // ── Node manual reconnection: cancel timer, reconnect immediately ──
+    if (sanitizedUpdates.isNodeDisconnected === false) {
+      const existingTimer = reconnectTimers.get(id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        reconnectTimers.delete(id);
+      }
+      // Create 2-3 new connections for this node
+      autoReconnectNode(id, roomId);
+    }
+
     if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json(participant);
   } catch (error) {
@@ -41,6 +80,37 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+// Auto-reconnect: set node as connected + create 2-3 new connections
+function autoReconnectNode(nodeId: string, roomId: string) {
+  // Mark node as connected again
+  store.updateParticipant(nodeId, { isNodeDisconnected: false });
+
+  // Find 2-3 peers to connect to
+  const targetDegree = 2 + Math.floor(Math.random() * 2); // 2 or 3
+  for (let i = 0; i < targetDegree; i++) {
+    const currentNeighborIds = new Set(store.getConnectedNodeIds(nodeId, roomId));
+    const participants = store.getParticipantsByRoom(roomId)
+      .filter(p => p.isActive && p.role === 'student' && !p.isNodeDisconnected && p.id !== nodeId);
+
+    const candidates = participants.filter(p => {
+      if (currentNeighborIds.has(p.id)) return false;
+      const theirConns = store.getActiveConnectionsForNode(p.id, roomId);
+      return theirConns.length < 3;
+    });
+
+    if (candidates.length === 0) break;
+    const target = candidates[Math.floor(Math.random() * candidates.length)];
+    store.createNodeConnection(roomId, {
+      nodeAId: nodeId,
+      nodeBId: target.id,
+      isActive: true,
+    });
+  }
+
+  const roomCode = store.getRoomCodeById(roomId);
+  if (roomCode) broadcastRoomUpdate(roomCode);
 }
 
 // GET: Get a specific participant

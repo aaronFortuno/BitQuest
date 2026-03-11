@@ -85,7 +85,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE: Destroy a specific connection between two nodes
+// DELETE: Destroy a specific connection between two nodes.
+// Auto-reconnection is delayed so the user can see the connection disappear
+// and the affected nodes "searching" for new peers before reconnecting.
+const CONN_RECONNECT_DELAY_MS = 3000; // 3 seconds
+
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -107,27 +111,27 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Trigger auto-reconnection for affected nodes
-    const affectedNodes = [conn.nodeAId, conn.nodeBId];
-    const reconnections = [];
-
-    for (const nodeId of affectedNodes) {
-      const currentConns = store.getActiveConnectionsForNode(nodeId, roomId);
-      // If a node has fewer than 2 connections, try to reconnect
-      if (currentConns.length < 2) {
-        const newConn = findReconnection(nodeId, roomId);
-        if (newConn) {
-          reconnections.push(newConn);
-        }
-      }
-    }
-
     const roomCode = store.getRoomCodeById(roomId);
     if (roomCode) broadcastRoomUpdate(roomCode);
 
+    // Schedule delayed reconnection for affected nodes
+    const affectedNodes = [conn.nodeAId, conn.nodeBId];
+    setTimeout(() => {
+      for (const nodeId of affectedNodes) {
+        // Skip if node is disconnected
+        const participant = store.getParticipant(nodeId);
+        if (!participant || participant.isNodeDisconnected) continue;
+
+        const currentConns = store.getActiveConnectionsForNode(nodeId, roomId);
+        if (currentConns.length < 2) {
+          findReconnection(nodeId, roomId);
+        }
+      }
+      if (roomCode) broadcastRoomUpdate(roomCode);
+    }, CONN_RECONNECT_DELAY_MS);
+
     return NextResponse.json({
       deactivated: conn,
-      reconnections,
     });
   } catch (error) {
     console.error('Error destroying connection:', error);

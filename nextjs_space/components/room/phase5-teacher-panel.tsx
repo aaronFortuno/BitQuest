@@ -174,11 +174,24 @@ export default function Phase5TeacherPanel({
   const mempoolCount = mempoolTransactions.filter(tx => tx.status === 'in_mempool').length;
   const propagatingCount = mempoolTransactions.filter(tx => tx.status === 'propagating').length;
 
-  // Force layout — use a larger internal canvas so nodes spread out
+  // Force layout — stable: only recomputes on explicit init or student count change.
+  // Individual connection changes do NOT trigger layout recalculation.
   const layoutWidth = 1200;
   const layoutHeight = 800;
+  const [layoutVersion, setLayoutVersion] = useState(0);
+  const prevStudentCount = useRef(0);
+
+  // Bump layout version when student count changes
+  useEffect(() => {
+    if (students.length !== prevStudentCount.current && students.length > 0) {
+      prevStudentCount.current = students.length;
+      setLayoutVersion(v => v + 1);
+    }
+  }, [students.length]);
 
   const layoutPositions = useMemo(() => {
+    // layoutVersion forces recalculation; nodeConnections read at compute time
+    void layoutVersion;
     const nodes = students.map(s => ({
       id: s.id,
       name: s.name,
@@ -188,7 +201,8 @@ export default function Phase5TeacherPanel({
       .filter(c => c.isActive)
       .map(c => ({ id: c.id, a: c.nodeAId, b: c.nodeBId }));
     return computeForceLayout(nodes, edges, layoutWidth, layoutHeight);
-  }, [students, nodeConnections]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutVersion]);
 
   // ─── Propagation animation (rAF-based, NOT SMIL) ───
   // Uses propagationEdges from the server for precise timing.
@@ -463,7 +477,10 @@ export default function Phase5TeacherPanel({
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {/* Initialize network */}
         <button
-          onClick={() => onInitializeNetwork?.(true)}
+          onClick={async () => {
+            await onInitializeNetwork?.(true);
+            setLayoutVersion(v => v + 1);
+          }}
           className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
         >
           <Zap className="w-3.5 h-3.5" />
@@ -577,13 +594,23 @@ export default function Phase5TeacherPanel({
               </filter>
             </defs>
             <rect x={-9999} y={-9999} width={99999} height={99999} fill="transparent" />
-            {/* Connection lines */}
-            {nodeConnections.filter(c => c.isActive).map(conn => {
+            {/* Connection lines — hide if either node is disconnected */}
+            {nodeConnections.filter(c => {
+              if (!c.isActive) return false;
+              const sA = students.find(s => s.id === c.nodeAId);
+              const sB = students.find(s => s.id === c.nodeBId);
+              if (sA?.isNodeDisconnected || sB?.isNodeDisconnected) return false;
+              return true;
+            }).map(conn => {
               const posA = layoutPositions.get(conn.nodeAId);
               const posB = layoutPositions.get(conn.nodeBId);
               if (!posA || !posB) return null;
 
               const isDisconnectMode = mode === 'disconnect';
+              // Detect new connections (created recently) for fade-in
+              const connAge = Date.now() - new Date(conn.createdAt).getTime();
+              const isNew = connAge < 2000;
+              const fadeOpacity = isNew ? Math.min(1, connAge / 1500) : 1;
 
               return (
                 <g key={conn.id}>
@@ -598,17 +625,37 @@ export default function Phase5TeacherPanel({
                       onClick={() => handleEdgeClick(conn.id)}
                     />
                   )}
-                  {/* Visible line — always neutral color, pulses provide propagation feedback */}
+                  {/* Visible line */}
                   <line
                     x1={posA.x} y1={posA.y}
                     x2={posB.x} y2={posB.y}
-                    stroke={isDisconnectMode ? '#f87171' : '#6b7280'}
+                    stroke={isDisconnectMode ? '#f87171' : isNew ? '#34d399' : '#6b7280'}
                     strokeWidth={2.5}
                     strokeLinecap="round"
-                    opacity={isDisconnectMode ? 0.7 : 1}
+                    opacity={(isDisconnectMode ? 0.7 : 1) * fadeOpacity}
                     className={isDisconnectMode ? 'cursor-pointer' : ''}
                     onClick={isDisconnectMode ? () => handleEdgeClick(conn.id) : undefined}
                   />
+                </g>
+              );
+            })}
+
+            {/* Radar waves for disconnected nodes (behind node circles) */}
+            {students.filter(s => s.isNodeDisconnected).map(student => {
+              const pos = layoutPositions.get(student.id);
+              if (!pos) return null;
+              return (
+                <g key={`radar-${student.id}`}>
+                  {[0, 1, 2].map(i => (
+                    <circle key={i} cx={pos.x} cy={pos.y} r={NODE_RADIUS}
+                      fill="none" stroke="#ef4444" strokeWidth={1.5}>
+                      <animate attributeName="r" from={String(NODE_RADIUS)}
+                        to={String(NODE_RADIUS + 60)} dur="2.5s"
+                        begin={`${i * 0.8}s`} repeatCount="indefinite" />
+                      <animate attributeName="opacity" from="0.6" to="0"
+                        dur="2.5s" begin={`${i * 0.8}s`} repeatCount="indefinite" />
+                    </circle>
+                  ))}
                 </g>
               );
             })}
@@ -635,12 +682,14 @@ export default function Phase5TeacherPanel({
                   className="cursor-pointer"
                   onClick={() => handleNodeClick(student.id)}
                 >
-                  {/* Floating animation wrapper */}
+                  {/* Floating animation — disconnected nodes drift more */}
                   <animateTransform
                     attributeName="transform"
                     type="translate"
-                    values={`0,0; ${ampX},${-ampY}; ${-ampX},${ampY}; 0,0`}
-                    dur={`${durX}s`}
+                    values={isDisconnected
+                      ? `0,0; ${ampX * 3},${-ampY * 2}; ${-ampX * 2},${ampY * 3}; 0,0`
+                      : `0,0; ${ampX},${-ampY}; ${-ampX},${ampY}; 0,0`}
+                    dur={isDisconnected ? `${durX * 1.5}s` : `${durX}s`}
                     repeatCount="indefinite"
                     additive="sum"
                   />
