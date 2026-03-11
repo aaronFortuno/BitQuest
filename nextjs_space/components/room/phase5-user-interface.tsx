@@ -25,7 +25,6 @@ interface Phase5UserInterfaceProps {
 }
 
 // ─── Constants ───
-const PULSE_DUR_S = 1.2;
 const FLASH_DUR_S = 0.5;
 const MINI_CX = 160, MINI_CY = 100, MINI_RADIUS = 80;
 const MINI_NODE_R = 22, MY_NODE_R = 28;
@@ -53,8 +52,8 @@ function MiniNodeGraph({
   participant: Participant;
   myNeighbors: Participant[];
   nodeConnections: NodeConnection[];
-  renderedPulses: { id: string; x: number; y: number; opacity: number; r: number }[];
-  renderedFlashes: { id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number }[];
+  renderedPulses: { id: string; x: number; y: number; opacity: number; r: number; color: string }[];
+  renderedFlashes: { id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number; color: string }[];
 }) {
   const connKey = (a: string, b: string) => [a, b].sort().join('-');
 
@@ -144,19 +143,19 @@ function MiniNodeGraph({
         </text>
       </g>
 
-      {/* Pulse dots (rAF-driven, rendered by parent) */}
+      {/* Pulse dots (rAF-driven, per-TX color) */}
       {renderedPulses.map(p => (
         <circle key={p.id} cx={p.x} cy={p.y} r={p.r}
-          fill="#facc15" opacity={p.opacity} filter="url(#mini-pulse-glow)" />
+          fill={p.color} opacity={p.opacity} filter="url(#mini-pulse-glow)" />
       ))}
 
-      {/* Flash effects (rAF-driven, rendered by parent) */}
+      {/* Flash effects (rAF-driven, per-TX color) */}
       {renderedFlashes.map(f => (
         <g key={f.id}>
           <circle cx={f.cx} cy={f.cy} r={MINI_NODE_R}
-            fill="#facc15" opacity={f.glowOpacity} />
+            fill={f.color} opacity={f.glowOpacity} />
           <circle cx={f.cx} cy={f.cy} r={f.ringR}
-            fill="none" stroke="#facc15" strokeWidth={2} opacity={f.ringOpacity} />
+            fill="none" stroke={f.color} strokeWidth={2} opacity={f.ringOpacity} />
         </g>
       ))}
     </svg>
@@ -241,13 +240,25 @@ export default function Phase5UserInterface({
     return positions;
   }, [participant.id, myNeighbors]);
 
-  const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
-  const pulsesRef = useRef<{ id: string; fromX: number; fromY: number; toX: number; toY: number; toNodeId: string; startTime: number }[]>([]);
-  const flashesRef = useRef<{ id: string; cx: number; cy: number; startTime: number }[]>([]);
+  // Uses propagationEdges from the server for precise timing.
+  // Each TX has its own color. Redundant edges show dimmer, no flash.
+
+  interface PulseData {
+    id: string; fromX: number; fromY: number; toX: number; toY: number;
+    toNodeId: string; startTime: number; duration: number;
+    color: string; redundant: boolean;
+  }
+  interface FlashData {
+    id: string; cx: number; cy: number; startTime: number; color: string;
+  }
+
+  const seenEdgesRef = useRef<Set<string>>(new Set());
+  const pulsesRef = useRef<PulseData[]>([]);
+  const flashesRef = useRef<FlashData[]>([]);
   const rAFRef = useRef<number>(0);
   const isAnimatingRef = useRef(false);
-  const [renderedPulses, setRenderedPulses] = useState<{ id: string; x: number; y: number; opacity: number; r: number }[]>([]);
-  const [renderedFlashes, setRenderedFlashes] = useState<{ id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number }[]>([]);
+  const [renderedPulses, setRenderedPulses] = useState<{ id: string; x: number; y: number; opacity: number; r: number; color: string }[]>([]);
+  const [renderedFlashes, setRenderedFlashes] = useState<{ id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number; color: string }[]>([]);
 
   const startAnimation = useCallback(() => {
     if (isAnimatingRef.current) return;
@@ -261,22 +272,24 @@ export default function Phase5UserInterface({
       lastFrame = timestamp;
       const now = Date.now();
 
-      const activePulses: typeof pulsesRef.current = [];
+      const activePulses: PulseData[] = [];
       const pulsePositions: typeof renderedPulses = [];
-      const completedPulses: typeof pulsesRef.current = [];
+      const completedPulses: PulseData[] = [];
 
       for (const pulse of pulsesRef.current) {
         const elapsed = now - pulse.startTime;
         if (elapsed < 0) { activePulses.push(pulse); continue; }
-        const progress = elapsed / (PULSE_DUR_S * 1000);
+        const progress = elapsed / pulse.duration;
         if (progress < 1) {
           const t = 1 - Math.pow(1 - progress, 2);
+          const baseOpacity = pulse.redundant ? 0.4 : 0.95;
           pulsePositions.push({
             id: pulse.id,
             x: pulse.fromX + (pulse.toX - pulse.fromX) * t,
             y: pulse.fromY + (pulse.toY - pulse.fromY) * t,
-            opacity: progress < 0.1 ? progress * 10 : 0.95,
+            opacity: progress < 0.1 ? (progress * 10) * baseOpacity : baseOpacity,
             r: 4 + 3 * Math.sin(progress * Math.PI),
+            color: pulse.color,
           });
           activePulses.push(pulse);
         } else {
@@ -287,14 +300,16 @@ export default function Phase5UserInterface({
       setRenderedPulses(pulsePositions);
 
       if (completedPulses.length > 0) {
-        const newFlashes = completedPulses.map(p => ({
-          id: `f-${p.toNodeId}-${now}-${p.id.slice(-4)}`,
-          cx: p.toX, cy: p.toY, startTime: now,
-        }));
+        const newFlashes = completedPulses
+          .filter(p => !p.redundant)
+          .map(p => ({
+            id: `f-${p.toNodeId}-${now}-${p.id.slice(-4)}`,
+            cx: p.toX, cy: p.toY, startTime: now, color: p.color,
+          }));
         flashesRef.current = [...flashesRef.current, ...newFlashes];
       }
 
-      const activeFlashes: typeof flashesRef.current = [];
+      const activeFlashes: FlashData[] = [];
       const flashPositions: typeof renderedFlashes = [];
       for (const flash of flashesRef.current) {
         const progress = (now - flash.startTime) / (FLASH_DUR_S * 1000);
@@ -303,7 +318,7 @@ export default function Phase5UserInterface({
           const glowOpacity = progress < 0.3 ? (progress / 0.3) * 0.45 : 0.45 * (1 - (progress - 0.3) / 0.7);
           const ringR = nodeR + 16 * progress;
           const ringOpacity = progress < 0.2 ? (progress / 0.2) * 0.6 : 0.6 * (1 - (progress - 0.2) / 0.8);
-          flashPositions.push({ id: flash.id, cx: flash.cx, cy: flash.cy, glowOpacity, ringR, ringOpacity });
+          flashPositions.push({ id: flash.id, cx: flash.cx, cy: flash.cy, glowOpacity, ringR, ringOpacity, color: flash.color });
           activeFlashes.push(flash);
         }
       }
@@ -321,66 +336,47 @@ export default function Phase5UserInterface({
 
   useEffect(() => () => cancelAnimationFrame(rAFRef.current), []);
 
-  // Detect propagation changes → create pulses with BFS cascade
+  // Read propagationEdges from server — only show pulses for edges visible in my mini graph
   useEffect(() => {
-    const prevMap = prevPropRef.current;
-    const now = Date.now();
+    const seen = seenEdgesRef.current;
     const relevantIds = new Set([participant.id, ...myNeighborIds]);
     let hasNew = false;
 
     for (const tx of mempoolTransactions) {
-      const currentSet = new Set(tx.propagatedTo || []);
-      const prevSet = prevMap.get(tx.id) || new Set<string>();
-      let hasNewNodes = false;
-      for (const nodeId of currentSet) {
-        if (!prevSet.has(nodeId)) { hasNewNodes = true; break; }
+      const edges = tx.propagationEdges;
+      if (!edges || edges.length === 0) continue;
+      const color = tx.propagationColor || '#facc15';
+
+      for (const edge of edges) {
+        const edgeKey = `${tx.id}-${edge.fromNodeId}-${edge.toNodeId}`;
+        if (seen.has(edgeKey)) continue;
+        seen.add(edgeKey);
+
+        // Only create visible pulse if both ends are in my view
+        if (!relevantIds.has(edge.fromNodeId) || !relevantIds.has(edge.toNodeId)) continue;
+
+        const from = miniGraphPositions.get(edge.fromNodeId);
+        const to = miniGraphPositions.get(edge.toNodeId);
+        if (!from || !to) continue;
+
+        pulsesRef.current.push({
+          id: `p-${edgeKey}`,
+          fromX: from.x, fromY: from.y,
+          toX: to.x, toY: to.y,
+          toNodeId: edge.toNodeId,
+          startTime: edge.startTime,
+          duration: edge.duration,
+          color, redundant: edge.redundant || false,
+        });
+        hasNew = true;
       }
-
-      if (hasNewNodes) {
-        const visited = new Set(prevSet);
-        for (const id of prevSet) visited.add(id);
-        let bfsFrontier = [...prevSet];
-        let layerIdx = 0;
-
-        while (bfsFrontier.length > 0) {
-          const nextFrontier: string[] = [];
-          const layerDelay = layerIdx * PULSE_DUR_S * 1000;
-
-          for (const sourceId of bfsFrontier) {
-            for (const conn of nodeConnections) {
-              if (!conn.isActive) continue;
-              const nId = conn.nodeAId === sourceId ? conn.nodeBId
-                        : conn.nodeBId === sourceId ? conn.nodeAId : null;
-              if (!nId || visited.has(nId) || !currentSet.has(nId)) continue;
-              visited.add(nId);
-              nextFrontier.push(nId);
-              // Only create visible pulse if both ends are in my view
-              if (relevantIds.has(sourceId) && relevantIds.has(nId)) {
-                const from = miniGraphPositions.get(sourceId);
-                const to = miniGraphPositions.get(nId);
-                if (from && to) {
-                  pulsesRef.current.push({
-                    id: `p-${tx.id}-${sourceId}-${nId}-${now}-L${layerIdx}`,
-                    fromX: from.x, fromY: from.y, toX: to.x, toY: to.y,
-                    toNodeId: nId, startTime: now + layerDelay,
-                  });
-                  hasNew = true;
-                }
-              }
-            }
-          }
-          bfsFrontier = nextFrontier;
-          layerIdx++;
-        }
-      }
-      prevMap.set(tx.id, currentSet);
     }
 
     if (hasNew) {
       isAnimatingRef.current = false;
       startAnimation();
     }
-  }, [mempoolTransactions, nodeConnections, participant.id, myNeighborIds, miniGraphPositions, startAnimation]);
+  }, [mempoolTransactions, participant.id, myNeighborIds, miniGraphPositions, startAnimation]);
 
   // Auto-dismiss feedback
   useEffect(() => {

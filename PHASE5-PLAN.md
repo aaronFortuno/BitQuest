@@ -303,18 +303,37 @@ La UI renderitza amb les noves props.
 - Mempool local ordenada per temps d'arribada (no per createdAt del servidor)
 - Propagació servidor: 3-5s per salt, polling 2.5s
 
-### Pendent de polir (feedback de l'usuari)
-L'usuari va dir "es veu molt millor" però queden coses per polir.
-Punts a revisar en la propera sessió:
-- **Revisar el comportament visual** dels polsos i flashes en detall
-- **Testejar amb més nodes** (10-30) per veure si escala bé
-- **Animació de reconnexió** quan es destrueix una connexió
-- **Responsivitat** mòbil/tablet
-- **Qualsevol feedback addicional** que doni l'usuari
-
-### Commits d'aquesta sessió
+### Commits sessió 2025-03-09
 | Commit | Descripció |
 |--------|------------|
 | `a575493` | Pas 7: Polsos SMIL (primer intent, no funcionava) |
 | `a0a4948` | Fix: línia groga, cascada BFS, flash suau, delay 3-5s |
 | `9c46d40` | Fix definitiu: rAF en lloc de SMIL + mempool local |
+
+---
+
+## Notes de revisió Pas 7 (sessió 2026-03-11)
+
+### Millores implementades
+- **Sincronització de polsos**: El servidor ara calcula el pla BFS complet
+  d'entrada (`propagationEdges`) amb timestamps absoluts. El client anima
+  immediatament amb la durada exacta (1.5-2.5s per salt). Abans el pols
+  començava DESPRÉS del delay; ara comença IMMEDIATAMENT i dura el temps
+  real de propagació.
+- **Color per TX**: Paleta de 12 colors vius assignats rotatòriament.
+  Cada TX té un color únic per polsos i flashes. Permet distingir
+  múltiples TX simultànies visualment.
+- **Protocol gossip realista**: Cada node reenvia la TX a tots els seus
+  veïns excepte el que li l'ha enviada. Edges redundants (node ja té la
+  TX) es mostren amb opacitat reduïda i sense flash. Simula el
+  comportament real de Bitcoin gossip.
+
+### Pendent de polir
+- **Desconnexió/reconnexió de nodes** — el mode disconnect necessita revisió
+- **Testejar amb més nodes** (10-30) per veure si escala bé
+- **Responsivitat** mòbil/tablet
+
+### Commits sessió 2026-03-11
+| Commit | Descripció |
+|--------|------------|
+| (pendent) | Polsos sincronitzats + color per TX + gossip realista |

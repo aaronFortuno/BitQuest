@@ -132,6 +132,15 @@ export interface UTXOTransaction {
 }
 
 // Phase 5: Mempool transaction
+// Edge in the propagation plan — describes one hop of the BFS
+export interface PropagationEdge {
+  fromNodeId: string;
+  toNodeId: string;
+  startTime: number;  // absolute timestamp (ms) when pulse begins
+  duration: number;    // ms for pulse to travel this edge
+  redundant?: boolean; // true if toNode already had the TX (realistic: node still sends it)
+}
+
 export interface MempoolTransaction {
   id: string;
   txId: string;
@@ -145,6 +154,8 @@ export interface MempoolTransaction {
   status: 'propagating' | 'in_mempool' | 'confirmed';
   propagatedTo: string[];
   propagationProgress: number;
+  propagationEdges?: PropagationEdge[];
+  propagationColor?: string;  // unique color for this TX's animation
   createdAt: string;
 }
 

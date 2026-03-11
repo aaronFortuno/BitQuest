@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
       status: 'propagating',
       propagatedTo: [effectiveSenderId],
       propagationProgress: 0,
+      propagationColor: nextTxColor(),
     });
 
     const result = {
@@ -109,83 +110,169 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── BFS propagation through the real connection graph ───
-// Each hop between nodes takes 1500-3000ms (random).
-// At each step, a node that receives the TX forwards it to its neighbors
-// that haven't received it yet. Disconnected nodes and inactive connections
-// are skipped.
+// Realistic protocol: every node that receives a TX for the first time
+// forwards it to ALL its neighbors. If a neighbor already has it,
+// the message still travels (visually) but the neighbor ignores it
+// and doesn't forward further. This matches how Bitcoin gossip works.
+
+// Palette of distinct, vibrant colors for TX animations
+const TX_COLORS = [
+  '#facc15', // yellow
+  '#38bdf8', // sky blue
+  '#fb923c', // orange
+  '#a78bfa', // violet
+  '#4ade80', // green
+  '#f472b6', // pink
+  '#22d3ee', // cyan
+  '#fbbf24', // amber
+  '#c084fc', // purple
+  '#34d399', // emerald
+  '#f87171', // red
+  '#60a5fa', // blue
+];
+let txColorIndex = 0;
+function nextTxColor(): string {
+  const color = TX_COLORS[txColorIndex % TX_COLORS.length];
+  txColorIndex++;
+  return color;
+}
+
+interface PlannedWave {
+  delay: number;
+  edges: { fromNodeId: string; toNodeId: string; startTime: number; duration: number; redundant: boolean }[];
+  newNodes: string[];
+}
+
+function computePropagationPlan(roomId: string, originNodeId: string, createdAtMs: number) {
+  const allParticipants = store.getParticipantsByRoom(roomId)
+    .filter(p => p.isActive && p.role === 'student' && !p.isNodeDisconnected);
+  const totalNodes = allParticipants.length;
+
+  if (totalNodes <= 1) {
+    return { waves: [] as PlannedWave[], totalNodes, allParticipantIds: allParticipants.map(p => p.id) };
+  }
+
+  // Tracks which nodes have the TX (for data: who actually stores it)
+  const propagatedSet = new Set<string>([originNodeId]);
+  // Tracks who sent the TX to each node (so we skip sending back to sender)
+  const receivedFrom = new Map<string, string>(); // nodeId → senderId
+  // Tracks which nodes will forward in the next wave (only first-time receivers)
+  let currentWave = [originNodeId];
+  let cumulativeDelay = 0;
+  const waves: PlannedWave[] = [];
+
+  while (currentWave.length > 0) {
+    const hopDuration = 1500 + Math.random() * 1000; // 1.5-2.5s per hop
+    const waveStartTime = createdAtMs + cumulativeDelay;
+    cumulativeDelay += hopDuration;
+
+    const nextWave: string[] = [];
+    const edges: PlannedWave['edges'] = [];
+
+    for (const nodeId of currentWave) {
+      const neighborIds = store.getConnectedNodeIds(nodeId, roomId);
+      // Who sent the TX to this node? Don't send it back to them.
+      const sender = receivedFrom.get(nodeId);
+
+      for (const neighborId of neighborIds) {
+        // Skip the node that sent us this TX — we know they have it
+        if (neighborId === sender) continue;
+
+        const neighbor = store.getParticipant(neighborId);
+        if (!neighbor || neighbor.isNodeDisconnected || !neighbor.isActive) continue;
+
+        if (propagatedSet.has(neighborId)) {
+          // Redundant: the neighbor already has the TX, but this node
+          // doesn't know that — so it still sends the message.
+          edges.push({
+            fromNodeId: nodeId,
+            toNodeId: neighborId,
+            startTime: waveStartTime,
+            duration: hopDuration,
+            redundant: true,
+          });
+        } else {
+          // New: first time this node receives the TX
+          propagatedSet.add(neighborId);
+          receivedFrom.set(neighborId, nodeId);
+          nextWave.push(neighborId);
+          edges.push({
+            fromNodeId: nodeId,
+            toNodeId: neighborId,
+            startTime: waveStartTime,
+            duration: hopDuration,
+            redundant: false,
+          });
+        }
+      }
+    }
+
+    if (edges.length > 0) {
+      waves.push({ delay: cumulativeDelay, edges, newNodes: nextWave });
+    }
+    currentWave = nextWave;
+  }
+
+  return { waves, totalNodes, allParticipantIds: allParticipants.map(p => p.id) };
+}
+
 async function simulateGraphPropagation(txId: string, roomId: string, originNodeId: string) {
   monitor.propagationStart();
   try {
-    // Count total reachable nodes (active, non-disconnected students)
-    const allParticipants = store.getParticipantsByRoom(roomId)
-      .filter(p => p.isActive && p.role === 'student' && !p.isNodeDisconnected);
-    const totalNodes = allParticipants.length;
+    const tx = store.getMempoolTransaction(txId);
+    if (!tx) return;
 
-    if (totalNodes <= 1) {
+    const createdAtMs = tx.createdAt.getTime();
+    const plan = computePropagationPlan(roomId, originNodeId, createdAtMs);
+
+    if (plan.waves.length === 0) {
       store.updateMempoolTransaction(txId, {
         status: 'in_mempool',
         propagationProgress: 100,
-        propagatedTo: allParticipants.map(p => p.id),
+        propagatedTo: plan.allParticipantIds,
       });
       const roomCode = store.getRoomCodeById(roomId);
       if (roomCode) broadcastRoomUpdate(roomCode);
       return;
     }
 
+    // Store the full propagation plan so the client can animate immediately
+    const allEdges = plan.waves.flatMap(w => w.edges);
+    store.updateMempoolTransaction(txId, { propagationEdges: allEdges });
+    const roomCode = store.getRoomCodeById(roomId);
+    if (roomCode) broadcastRoomUpdate(roomCode);
+
+    // Execute waves with real delays (for propagatedTo consistency)
     const propagatedSet = new Set<string>([originNodeId]);
-
-    // BFS queue: each entry is a node that just received the TX
-    // and will forward it to its neighbors in the next wave
-    let currentWave = [originNodeId];
-
-    while (currentWave.length > 0) {
-      // Delay before this wave propagates (simulates network latency)
-      const delay = 3000 + Math.random() * 2000; // 3-5s per hop
-      await new Promise(resolve => setTimeout(resolve, delay));
-
-      const nextWave: string[] = [];
-
-      for (const nodeId of currentWave) {
-        // Get this node's active neighbors via real connections
-        const neighborIds = store.getConnectedNodeIds(nodeId, roomId);
-
-        for (const neighborId of neighborIds) {
-          // Skip already propagated nodes
-          if (propagatedSet.has(neighborId)) continue;
-
-          // Skip disconnected nodes
-          const neighbor = store.getParticipant(neighborId);
-          if (!neighbor || neighbor.isNodeDisconnected || !neighbor.isActive) continue;
-
-          propagatedSet.add(neighborId);
-          nextWave.push(neighborId);
-        }
+    for (const wave of plan.waves) {
+      // Wait until this wave should complete
+      const elapsed = Date.now() - createdAtMs;
+      const remaining = wave.delay - elapsed;
+      if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
       }
 
-      // Update transaction state after this wave
-      if (nextWave.length > 0) {
-        const progress = Math.round((propagatedSet.size / totalNodes) * 100);
-        store.updateMempoolTransaction(txId, {
-          propagatedTo: Array.from(propagatedSet),
-          propagationProgress: progress,
-          status: progress >= 100 ? 'in_mempool' : 'propagating',
-        });
-
-        const roomCode = store.getRoomCodeById(roomId);
-        if (roomCode) broadcastRoomUpdate(roomCode);
+      for (const nodeId of wave.newNodes) {
+        propagatedSet.add(nodeId);
       }
 
-      currentWave = nextWave;
+      const progress = Math.round((propagatedSet.size / plan.totalNodes) * 100);
+      store.updateMempoolTransaction(txId, {
+        propagatedTo: Array.from(propagatedSet),
+        propagationProgress: progress,
+        status: progress >= 100 ? 'in_mempool' : 'propagating',
+      });
+
+      if (roomCode) broadcastRoomUpdate(roomCode);
     }
 
-    // Final check: mark as in_mempool even if some nodes are unreachable
-    const tx = store.getMempoolTransaction(txId);
-    if (tx && tx.status === 'propagating') {
+    // Final: mark as in_mempool if still propagating
+    const finalTx = store.getMempoolTransaction(txId);
+    if (finalTx && finalTx.status === 'propagating') {
       store.updateMempoolTransaction(txId, {
         status: 'in_mempool',
-        propagationProgress: Math.round((propagatedSet.size / totalNodes) * 100),
+        propagationProgress: Math.round((propagatedSet.size / plan.totalNodes) * 100),
       });
-      const roomCode = store.getRoomCodeById(roomId);
       if (roomCode) broadcastRoomUpdate(roomCode);
     }
   } catch (error) {

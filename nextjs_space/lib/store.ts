@@ -104,6 +104,14 @@ export interface UTXOTransactionData {
   createdAt: Date;
 }
 
+export interface PropagationEdgeData {
+  fromNodeId: string;
+  toNodeId: string;
+  startTime: number;
+  duration: number;
+  redundant?: boolean;
+}
+
 export interface MempoolTransactionData {
   id: string;
   txId: string;
@@ -115,6 +123,8 @@ export interface MempoolTransactionData {
   status: string;
   propagatedTo: string[];
   propagationProgress: number;
+  propagationEdges: PropagationEdgeData[];
+  propagationColor: string;
   createdAt: Date;
 }
 
@@ -503,6 +513,8 @@ export const store = {
       status: data.status || 'propagating',
       propagatedTo: data.propagatedTo || [],
       propagationProgress: data.propagationProgress || 0,
+      propagationEdges: data.propagationEdges || [],
+      propagationColor: data.propagationColor || '#facc15',
       createdAt: new Date(),
     };
     state.mempoolTransactions.set(tx.id, tx);

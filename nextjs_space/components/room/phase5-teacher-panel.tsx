@@ -46,7 +46,6 @@ interface NodePos {
 
 const NODE_RADIUS = 30;
 const MIN_NODE_DISTANCE = NODE_RADIUS * 4; // Minimum distance between node centers
-const PULSE_DUR_S = 1.2; // seconds for pulse to travel along an edge
 const FLASH_DUR_S = 0.5; // seconds for node flash ring
 
 function computeForceLayout(
@@ -192,13 +191,26 @@ export default function Phase5TeacherPanel({
   }, [students, nodeConnections]);
 
   // ─── Propagation animation (rAF-based, NOT SMIL) ───
-  const prevPropRef = useRef<Map<string, Set<string>>>(new Map());
-  const pulsesRef = useRef<{ id: string; fromX: number; fromY: number; toX: number; toY: number; toNodeId: string; startTime: number }[]>([]);
-  const flashesRef = useRef<{ id: string; cx: number; cy: number; startTime: number }[]>([]);
+  // Uses propagationEdges from the server for precise timing.
+  // Each TX has its own color. Redundant edges (node already has TX) show
+  // a dimmer pulse with no flash — realistic gossip protocol visualization.
+
+  interface PulseData {
+    id: string; fromX: number; fromY: number; toX: number; toY: number;
+    toNodeId: string; startTime: number; duration: number;
+    color: string; redundant: boolean;
+  }
+  interface FlashData {
+    id: string; cx: number; cy: number; startTime: number; color: string;
+  }
+
+  const seenEdgesRef = useRef<Set<string>>(new Set());
+  const pulsesRef = useRef<PulseData[]>([]);
+  const flashesRef = useRef<FlashData[]>([]);
   const rAFRef = useRef<number>(0);
   const isAnimatingRef = useRef(false);
-  const [renderedPulses, setRenderedPulses] = useState<{ id: string; x: number; y: number; opacity: number; r: number }[]>([]);
-  const [renderedFlashes, setRenderedFlashes] = useState<{ id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number }[]>([]);
+  const [renderedPulses, setRenderedPulses] = useState<{ id: string; x: number; y: number; opacity: number; r: number; color: string }[]>([]);
+  const [renderedFlashes, setRenderedFlashes] = useState<{ id: string; cx: number; cy: number; glowOpacity: number; ringR: number; ringOpacity: number; color: string }[]>([]);
 
   const startAnimation = useCallback(() => {
     if (isAnimatingRef.current) return;
@@ -212,23 +224,25 @@ export default function Phase5TeacherPanel({
       lastFrame = timestamp;
       const now = Date.now();
 
-      // Process pulses
-      const activePulses: typeof pulsesRef.current = [];
+      // Process pulses — each pulse has its own duration + color
+      const activePulses: PulseData[] = [];
       const pulsePositions: typeof renderedPulses = [];
-      const completedPulses: typeof pulsesRef.current = [];
+      const completedPulses: PulseData[] = [];
 
       for (const pulse of pulsesRef.current) {
         const elapsed = now - pulse.startTime;
-        if (elapsed < 0) { activePulses.push(pulse); continue; } // future start
-        const progress = elapsed / (PULSE_DUR_S * 1000);
+        if (elapsed < 0) { activePulses.push(pulse); continue; }
+        const progress = elapsed / pulse.duration;
         if (progress < 1) {
           const t = 1 - Math.pow(1 - progress, 2); // ease-out
+          const baseOpacity = pulse.redundant ? 0.4 : 0.95;
           pulsePositions.push({
             id: pulse.id,
             x: pulse.fromX + (pulse.toX - pulse.fromX) * t,
             y: pulse.fromY + (pulse.toY - pulse.fromY) * t,
-            opacity: progress < 0.1 ? progress * 10 : 0.95,
+            opacity: progress < 0.1 ? (progress * 10) * baseOpacity : baseOpacity,
             r: 5 + 4 * Math.sin(progress * Math.PI),
+            color: pulse.color,
           });
           activePulses.push(pulse);
         } else {
@@ -238,18 +252,20 @@ export default function Phase5TeacherPanel({
       pulsesRef.current = activePulses;
       setRenderedPulses(pulsePositions);
 
-      // Create flashes for completed pulses
+      // Create flashes only for non-redundant completed pulses
       if (completedPulses.length > 0) {
-        const newFlashes = completedPulses.map(p => ({
-          id: `f-${p.toNodeId}-${now}-${p.id.slice(-4)}`,
-          cx: p.toX, cy: p.toY,
-          startTime: now,
-        }));
+        const newFlashes = completedPulses
+          .filter(p => !p.redundant)
+          .map(p => ({
+            id: `f-${p.toNodeId}-${now}-${p.id.slice(-4)}`,
+            cx: p.toX, cy: p.toY,
+            startTime: now, color: p.color,
+          }));
         flashesRef.current = [...flashesRef.current, ...newFlashes];
       }
 
       // Process flashes
-      const activeFlashes: typeof flashesRef.current = [];
+      const activeFlashes: FlashData[] = [];
       const flashPositions: typeof renderedFlashes = [];
       for (const flash of flashesRef.current) {
         const progress = (now - flash.startTime) / (FLASH_DUR_S * 1000);
@@ -257,7 +273,7 @@ export default function Phase5TeacherPanel({
           const glowOpacity = progress < 0.3 ? (progress / 0.3) * 0.45 : 0.45 * (1 - (progress - 0.3) / 0.7);
           const ringR = NODE_RADIUS + 22 * progress;
           const ringOpacity = progress < 0.2 ? (progress / 0.2) * 0.6 : 0.6 * (1 - (progress - 0.2) / 0.8);
-          flashPositions.push({ id: flash.id, cx: flash.cx, cy: flash.cy, glowOpacity, ringR, ringOpacity });
+          flashPositions.push({ id: flash.id, cx: flash.cx, cy: flash.cy, glowOpacity, ringR, ringOpacity, color: flash.color });
           activeFlashes.push(flash);
         }
       }
@@ -276,62 +292,43 @@ export default function Phase5TeacherPanel({
   // Cleanup rAF on unmount
   useEffect(() => () => cancelAnimationFrame(rAFRef.current), []);
 
-  // Detect propagation changes → create pulses with pixel coords + BFS cascade
+  // Read propagationEdges from server and create pulses with exact timestamps
   useEffect(() => {
-    const prevMap = prevPropRef.current;
-    const now = Date.now();
+    const seen = seenEdgesRef.current;
     let hasNew = false;
 
     for (const tx of mempoolTransactions) {
-      const currentSet = new Set(tx.propagatedTo || []);
-      const prevSet = prevMap.get(tx.id) || new Set<string>();
-      let hasNewNodes = false;
-      for (const nodeId of currentSet) {
-        if (!prevSet.has(nodeId)) { hasNewNodes = true; break; }
+      const edges = tx.propagationEdges;
+      if (!edges || edges.length === 0) continue;
+      const color = tx.propagationColor || '#facc15';
+
+      for (const edge of edges) {
+        const edgeKey = `${tx.id}-${edge.fromNodeId}-${edge.toNodeId}`;
+        if (seen.has(edgeKey)) continue;
+        seen.add(edgeKey);
+
+        const from = layoutPositions.get(edge.fromNodeId);
+        const to = layoutPositions.get(edge.toNodeId);
+        if (!from || !to) continue;
+
+        pulsesRef.current.push({
+          id: `p-${edgeKey}`,
+          fromX: from.x, fromY: from.y,
+          toX: to.x, toY: to.y,
+          toNodeId: edge.toNodeId,
+          startTime: edge.startTime,
+          duration: edge.duration,
+          color, redundant: edge.redundant || false,
+        });
+        hasNew = true;
       }
-
-      if (hasNewNodes) {
-        // BFS cascade from prev frontier
-        const visited = new Set(prevSet);
-        let bfsFrontier = [...prevSet];
-        let layerIdx = 0;
-
-        while (bfsFrontier.length > 0) {
-          const nextFrontier: string[] = [];
-          const layerDelay = layerIdx * PULSE_DUR_S * 1000;
-
-          for (const sourceId of bfsFrontier) {
-            for (const conn of nodeConnections) {
-              if (!conn.isActive) continue;
-              const nId = conn.nodeAId === sourceId ? conn.nodeBId
-                        : conn.nodeBId === sourceId ? conn.nodeAId : null;
-              if (!nId || visited.has(nId) || !currentSet.has(nId)) continue;
-              visited.add(nId);
-              nextFrontier.push(nId);
-              const from = layoutPositions.get(sourceId);
-              const to = layoutPositions.get(nId);
-              if (from && to) {
-                pulsesRef.current.push({
-                  id: `p-${tx.id}-${sourceId}-${nId}-${now}-L${layerIdx}`,
-                  fromX: from.x, fromY: from.y, toX: to.x, toY: to.y,
-                  toNodeId: nId, startTime: now + layerDelay,
-                });
-                hasNew = true;
-              }
-            }
-          }
-          bfsFrontier = nextFrontier;
-          layerIdx++;
-        }
-      }
-      prevMap.set(tx.id, currentSet);
     }
 
     if (hasNew) {
-      isAnimatingRef.current = false; // allow restart
+      isAnimatingRef.current = false;
       startAnimation();
     }
-  }, [mempoolTransactions, nodeConnections, layoutPositions, startAnimation]);
+  }, [mempoolTransactions, layoutPositions, startAnimation]);
 
   // Compute a viewBox that fits all nodes with padding
   const fittedViewBox = useMemo(() => {
@@ -693,19 +690,19 @@ export default function Phase5TeacherPanel({
               );
             })}
 
-            {/* ─── Propagation pulse dots (rAF-driven) ─── */}
+            {/* ─── Propagation pulse dots (rAF-driven, per-TX color) ─── */}
             {renderedPulses.map(p => (
               <circle key={p.id} cx={p.x} cy={p.y} r={p.r}
-                fill="#facc15" opacity={p.opacity} filter="url(#pulse-glow)" />
+                fill={p.color} opacity={p.opacity} filter="url(#pulse-glow)" />
             ))}
 
-            {/* ─── Node flash effects (rAF-driven) ─── */}
+            {/* ─── Node flash effects (rAF-driven, per-TX color) ─── */}
             {renderedFlashes.map(f => (
               <g key={f.id}>
                 <circle cx={f.cx} cy={f.cy} r={NODE_RADIUS}
-                  fill="#facc15" opacity={f.glowOpacity} />
+                  fill={f.color} opacity={f.glowOpacity} />
                 <circle cx={f.cx} cy={f.cy} r={f.ringR}
-                  fill="none" stroke="#facc15" strokeWidth={2.5} opacity={f.ringOpacity} />
+                  fill="none" stroke={f.color} strokeWidth={2.5} opacity={f.ringOpacity} />
               </g>
             ))}
           </svg>
