@@ -336,4 +336,4 @@ La UI renderitza amb les noves props.
 ### Commits sessió 2026-03-11
 | Commit | Descripció |
 |--------|------------|
-| (pendent) | Polsos sincronitzats + color per TX + gossip realista |
+| `29b32a2` | Polsos sincronitzats + color per TX + gossip realista |

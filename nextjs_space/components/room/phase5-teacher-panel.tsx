@@ -142,7 +142,6 @@ function computeForceLayout(
     }
   }
 
-  // No clamping to bounds — let the viewBox adapt to actual positions
   const result = new Map<string, { x: number; y: number }>();
   positions.forEach(p => result.set(p.id, { x: p.x, y: p.y }));
   return result;
@@ -189,8 +188,8 @@ export default function Phase5TeacherPanel({
     }
   }, [students.length]);
 
-  const layoutPositions = useMemo(() => {
-    // layoutVersion forces recalculation; nodeConnections read at compute time
+  // Base positions from force-layout (computed on init / student count change)
+  const baseLayoutPositions = useMemo(() => {
     void layoutVersion;
     const nodes = students.map(s => ({
       id: s.id,
@@ -203,6 +202,75 @@ export default function Phase5TeacherPanel({
     return computeForceLayout(nodes, edges, layoutWidth, layoutHeight);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutVersion]);
+
+  // Manual drag overrides — stores absolute positions for dragged nodes
+  const [dragPositions, setDragPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+
+  // Reset drag positions when layout recomputes
+  useEffect(() => {
+    setDragPositions(new Map());
+  }, [layoutVersion]);
+
+  // Final positions: manual override takes precedence over force-layout
+  const layoutPositions = useMemo(() => {
+    const merged = new Map<string, { x: number; y: number }>();
+    for (const [id, pos] of baseLayoutPositions) {
+      merged.set(id, dragPositions.get(id) || pos);
+    }
+    return merged;
+  }, [baseLayoutPositions, dragPositions]);
+
+  // ─── Node drag & drop ───
+  const dragRef = useRef<{
+    nodeId: string;
+    startX: number; startY: number;
+    origX: number; origY: number;
+  } | null>(null);
+  const didDragRef = useRef(false);
+
+  const handleNodePointerDown = useCallback((e: React.PointerEvent, nodeId: string) => {
+    e.stopPropagation(); // don't start pan
+    const pos = layoutPositions.get(nodeId);
+    if (!pos) return;
+    didDragRef.current = false;
+    dragRef.current = {
+      nodeId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: pos.x,
+      origY: pos.y,
+    };
+    (e.target as SVGElement).setPointerCapture(e.pointerId);
+  }, [layoutPositions]);
+
+  const handleNodePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    // Only start dragging after a minimum threshold (5px)
+    if (!didDragRef.current && Math.abs(dx) + Math.abs(dy) < 5) return;
+    didDragRef.current = true;
+
+    const svg = (e.target as SVGElement).closest('svg');
+    if (!svg) return;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const scale = ctm.a;
+    const newPos = {
+      x: dragRef.current.origX + dx / scale,
+      y: dragRef.current.origY + dy / scale,
+    };
+    setDragPositions(prev => {
+      const next = new Map(prev);
+      next.set(dragRef.current!.nodeId, newPos);
+      return next;
+    });
+  }, []);
+
+  const handleNodePointerUp = useCallback(() => {
+    dragRef.current = null;
+    // didDragRef stays true until next pointerDown — onClick reads it
+  }, []);
 
   // ─── Propagation animation (rAF-based, NOT SMIL) ───
   // Uses propagationEdges from the server for precise timing.
@@ -640,15 +708,24 @@ export default function Phase5TeacherPanel({
               );
             })}
 
-            {/* Radar waves for disconnected nodes (behind node circles) */}
-            {students.filter(s => s.isNodeDisconnected).map(student => {
+            {/* Radar waves for nodes searching for peers (disconnected OR orphaned) */}
+            {students.filter(s => {
+              if (s.isNodeDisconnected) return true;
+              // Orphan: no active connections
+              const conns = nodeConnections.filter(c =>
+                c.isActive && (c.nodeAId === s.id || c.nodeBId === s.id)
+              );
+              return conns.length === 0;
+            }).map(student => {
               const pos = layoutPositions.get(student.id);
               if (!pos) return null;
+              const isDisc = student.isNodeDisconnected;
+              const color = isDisc ? '#ef4444' : '#f59e0b'; // red if disconnected, amber if orphan
               return (
                 <g key={`radar-${student.id}`}>
                   {[0, 1, 2].map(i => (
                     <circle key={i} cx={pos.x} cy={pos.y} r={NODE_RADIUS}
-                      fill="none" stroke="#ef4444" strokeWidth={1.5}>
+                      fill="none" stroke={color} strokeWidth={1.5}>
                       <animate attributeName="r" from={String(NODE_RADIUS)}
                         to={String(NODE_RADIUS + 60)} dur="2.5s"
                         begin={`${i * 0.8}s`} repeatCount="indefinite" />
@@ -665,6 +742,10 @@ export default function Phase5TeacherPanel({
               const pos = layoutPositions.get(student.id);
               if (!pos) return null;
               const isDisconnected = student.isNodeDisconnected || false;
+              const isOrphan = !isDisconnected && nodeConnections.filter(c =>
+                c.isActive && (c.nodeAId === student.id || c.nodeBId === student.id)
+              ).length === 0;
+              const isSearching = isDisconnected || isOrphan;
               const txCount = mempoolTransactions.filter(tx =>
                 tx.propagatedTo?.includes(student.id)
               ).length;
@@ -680,19 +761,23 @@ export default function Phase5TeacherPanel({
                 <g
                   key={student.id}
                   className="cursor-pointer"
-                  onClick={() => handleNodeClick(student.id)}
+                  style={{ touchAction: 'none' }}
+                  onClick={() => { if (!didDragRef.current) handleNodeClick(student.id); }}
+                  onPointerDown={(e) => handleNodePointerDown(e, student.id)}
+                  onPointerMove={handleNodePointerMove}
+                  onPointerUp={handleNodePointerUp}
                 >
-                  {/* Floating animation — disconnected nodes drift more */}
+                  {/* Floating animation — amplified when searching for peers */}
                   <animateTransform
-                    attributeName="transform"
-                    type="translate"
-                    values={isDisconnected
-                      ? `0,0; ${ampX * 3},${-ampY * 2}; ${-ampX * 2},${ampY * 3}; 0,0`
-                      : `0,0; ${ampX},${-ampY}; ${-ampX},${ampY}; 0,0`}
-                    dur={isDisconnected ? `${durX * 1.5}s` : `${durX}s`}
-                    repeatCount="indefinite"
-                    additive="sum"
-                  />
+                      attributeName="transform"
+                      type="translate"
+                      values={isSearching
+                        ? `0,0; ${ampX * 3},${-ampY * 2}; ${-ampX * 2},${ampY * 3}; 0,0`
+                        : `0,0; ${ampX},${-ampY}; ${-ampX},${ampY}; 0,0`}
+                      dur={isSearching ? `${durX * 1.5}s` : `${durX}s`}
+                      repeatCount="indefinite"
+                      additive="sum"
+                    />
                   {/* Node circle */}
                   <circle
                     cx={pos.x} cy={pos.y}
