@@ -131,6 +131,9 @@ export default function RoomPage() {
     selectTransactionsForBlock,
     forceHalving,
     updateHalvingSettings,
+    autoMineTick,
+    updatePhase8Settings,
+    autoMineSettings,
     // Phase 9
     simulationStats,
     startSimulation,
@@ -360,14 +363,10 @@ export default function RoomPage() {
           participant={currentParticipant!}
           blocks={blocks}
           mempoolTransactions={mempoolTransactions}
-          difficultyInfo={difficultyInfo}
           halvingInfo={halvingInfo}
-          economicStats={economicStats}
-          onCreatePendingBlock={createPendingBlock}
-          onCalculateHash={calculateMiningHash}
-          onSubmitBlock={submitMinedBlock}
-          onSelectTransactions={selectTransactionsForBlock}
+          autoMineSettings={autoMineSettings}
           onCreateTransaction={createMempoolTransaction}
+          onAutoMineTick={autoMineTick}
         />
       );
     }
@@ -508,6 +507,8 @@ export default function RoomPage() {
             onDeletePool={deletePool}
             onForceHalving={forceHalving}
             onUpdateHalvingSettings={updateHalvingSettings}
+            autoMineSettings={autoMineSettings}
+            onUpdatePhase8Settings={updatePhase8Settings}
             // Phase 9
             simulationStats={simulationStats}
             onStartSimulation={startSimulation}

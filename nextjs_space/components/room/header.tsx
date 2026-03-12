@@ -109,12 +109,12 @@ export default function Header({
 
           {/* Right: Stats & Controls */}
           <div className="flex items-center gap-3">
-            {!isTeacher && currentPhase >= 6 && miningReward != null ? (
+            {!isTeacher && currentPhase >= 6 && currentPhase < 8 && miningReward != null ? (
               <span className="px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center gap-1">
                 <Pickaxe className="w-3.5 h-3.5" />
                 {miningReward} BTC
               </span>
-            ) : !isTeacher && studentBalance != null && (
+            ) : !isTeacher && currentPhase < 6 && studentBalance != null && (
               <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                 studentBalance >= 0
                   ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'

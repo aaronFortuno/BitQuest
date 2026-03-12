@@ -5,9 +5,48 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.7.1';
+const VERSION = 'v0.4.8';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.8',
+    date: '2026-03-12',
+    changes: {
+      ca: [
+        'Fase 8: mercat de comissions — els alumnes envien transaccions amb fee variable i descobreixen que fees més altes = confirmació més ràpida',
+        'Auto-mining: el sistema mina blocs automàticament cada 15-60s (configurable pel professor)',
+        'Capacitat de bloc configurable: el professor ajusta quantes tx caben per bloc (1-8)',
+        'Mempool amb tall visual: línia vermella mostra quines tx entraran al pròxim bloc',
+        'Indicador de probabilitat de confirmació segons la fee triada',
+        'Halving com a demo puntual: el professor pot reduir la recompensa de bloc',
+        'Dashboard professor amb visor mempool idèntic al dels alumnes per projectar a classe',
+        'Header alumne: eliminat badge de saldo (irrellevant a fase 8)',
+        'Icona mempool corregida (Activity en lloc de DollarSign)',
+      ],
+      es: [
+        'Fase 8: mercado de comisiones — los alumnos envían transacciones con fee variable y descubren que fees más altas = confirmación más rápida',
+        'Auto-mining: el sistema mina bloques automáticamente cada 15-60s (configurable por el profesor)',
+        'Capacidad de bloque configurable: el profesor ajusta cuántas tx caben por bloque (1-8)',
+        'Mempool con corte visual: línea roja muestra qué tx entrarán en el próximo bloque',
+        'Indicador de probabilidad de confirmación según la fee elegida',
+        'Halving como demo puntual: el profesor puede reducir la recompensa de bloque',
+        'Dashboard profesor con visor mempool idéntico al de los alumnos para proyectar en clase',
+        'Header alumno: eliminado badge de saldo (irrelevante en fase 8)',
+        'Icono mempool corregido (Activity en lugar de DollarSign)',
+      ],
+      en: [
+        'Phase 8: fee market — students send transactions with variable fees and discover that higher fees = faster confirmation',
+        'Auto-mining: the system mines blocks automatically every 15-60s (teacher-configurable)',
+        'Configurable block capacity: teacher adjusts how many tx fit per block (1-8)',
+        'Mempool with visual cut line: red line shows which tx will enter the next block',
+        'Confirmation probability indicator based on chosen fee',
+        'Halving as one-time demo: teacher can reduce block reward',
+        'Teacher dashboard with mempool viewer identical to student view for classroom projection',
+        'Student header: removed balance badge (irrelevant in phase 8)',
+        'Mempool icon fixed (Activity instead of DollarSign)',
+      ],
+    },
+  },
   {
     version: 'v0.4.7.1',
     date: '2026-03-12',

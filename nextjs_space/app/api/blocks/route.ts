@@ -300,6 +300,10 @@ export async function GET(request: NextRequest) {
         totalFeesPaid,
         totalBlockRewardsPaid,
         minerEarnings
+      },
+      autoMineSettings: {
+        autoMineInterval: room.autoMineInterval,
+        autoMineCapacity: room.autoMineCapacity,
       }
     });
   } catch (error) {
@@ -1001,6 +1005,186 @@ export async function POST(request: NextRequest) {
       store.updateParticipant(participantId, { rigSpeed: newSpeed });
       if (roomCode) broadcastRoomUpdate(roomCode);
       return NextResponse.json({ success: true, newSpeed });
+    }
+
+    // Action: Auto-mine a block (Phase 8 — system mines, no human miner)
+    if (action === 'auto-mine-tick') {
+      let blocks = store.getBlocksByRoom(roomId);
+
+      // Guard: reject if last block was mined too recently (prevents multiple clients mining simultaneously)
+      const minedBlocks = blocks.filter(b => b.status === 'mined');
+      if (minedBlocks.length > 0) {
+        const lastMined = minedBlocks.reduce((a, b) => a.blockNumber > b.blockNumber ? a : b);
+        if (lastMined.minedAt) {
+          const elapsed = (Date.now() - new Date(lastMined.minedAt).getTime()) / 1000;
+          const minInterval = (room.autoMineInterval || 20) * 0.7;
+          if (elapsed < minInterval) {
+            return NextResponse.json({ success: false, skipped: true, message: 'Too soon since last block' });
+          }
+        }
+      }
+
+      // Auto-create genesis block if none exists
+      if (blocks.length === 0) {
+        const genesisHash = createHash('sha256')
+          .update('1:0000000000000000:[]:0')
+          .digest('hex');
+        store.createBlock(roomId, {
+          blockNumber: 1,
+          previousHash: '0000000000000000',
+          status: 'mined',
+          difficulty: room.currentDifficulty,
+          miningTarget: room.miningTarget,
+          reward: 0,
+          transactions: '[]',
+          selectedTxIds: [],
+          totalFees: 0,
+          nonce: 0,
+          hash: genesisHash,
+          minedAt: new Date(),
+        });
+        blocks = store.getBlocksByRoom(roomId);
+      }
+
+      const existingPending = blocks.find(b => b.status === 'pending');
+
+      // Skip if there's already a pending block (shouldn't happen in auto-mine, but safety)
+      if (existingPending) {
+        store.updateBlock(existingPending.id, { status: 'mined', minedAt: new Date(), hash: 'auto', nonce: 0 });
+      }
+
+      const lastBlock = blocks
+        .filter(b => b.status === 'mined')
+        .sort((a, b) => b.blockNumber - a.blockNumber)[0] || null;
+
+      const newBlockNumber = (lastBlock?.blockNumber ?? 0) + 1;
+      const previousHash = lastBlock?.hash || '0000000000000000';
+
+      // Select top N transactions from mempool by fee (highest first)
+      const capacity = room.autoMineCapacity || 3;
+      const mempoolTxs = store.getMempoolTransactionsByRoom(roomId)
+        .filter(tx => tx.status === 'in_mempool')
+        .sort((a, b) => b.fee - a.fee)
+        .slice(0, capacity);
+
+      const totalFees = mempoolTxs.reduce((sum, tx) => sum + tx.fee, 0);
+      const selectedTxIds = mempoolTxs.map(tx => tx.id);
+
+      // Build transaction summaries
+      const txSummaries = mempoolTxs.map(tx => {
+        const sender = store.getParticipant(tx.senderId);
+        const receiver = store.getParticipant(tx.receiverId);
+        return {
+          sender: sender?.name || 'Unknown',
+          receiver: receiver?.name || 'Unknown',
+          amount: tx.amount,
+          fee: tx.fee,
+        };
+      });
+
+      const currentReward = Math.floor(room.currentBlockReward);
+      const blockHash = createHash('sha256')
+        .update(`${newBlockNumber}:${previousHash}:${JSON.stringify(txSummaries)}:auto`)
+        .digest('hex');
+
+      const newBlock = store.createBlock(roomId, {
+        blockNumber: newBlockNumber,
+        previousHash,
+        status: 'mined',
+        difficulty: room.currentDifficulty,
+        miningTarget: room.miningTarget,
+        reward: currentReward,
+        transactions: JSON.stringify(txSummaries),
+        selectedTxIds,
+        totalFees,
+        nonce: 0,
+        hash: blockHash,
+        minedAt: new Date(),
+        minerId: null,  // No human miner — system auto-mines
+      });
+
+      // Mark selected mempool transactions as confirmed
+      for (const txId of selectedTxIds) {
+        store.updateMempoolTransaction(txId, { status: 'confirmed' });
+      }
+
+      // Update total BTC emitted
+      const newTotalEmitted = room.totalBtcEmitted + currentReward;
+      store.updateRoom(roomId, { totalBtcEmitted: newTotalEmitted });
+
+      // Check for halving (optional, if teacher has enabled it)
+      let halvingEvent = null;
+      if (newBlockNumber > 0 && newBlockNumber % room.halvingInterval === 0) {
+        const newReward = room.currentBlockReward / 2;
+        if (newReward >= 0.01) {
+          store.updateRoom(roomId, { currentBlockReward: newReward });
+          halvingEvent = {
+            previousReward: room.currentBlockReward,
+            newReward,
+            halvingNumber: Math.floor(newBlockNumber / room.halvingInterval),
+            blockNumber: newBlockNumber,
+          };
+        }
+      }
+
+      if (roomCode) broadcastRoomUpdate(roomCode);
+      return NextResponse.json({
+        success: true,
+        block: {
+          ...newBlock,
+          miner: null,
+          transactions: txSummaries,
+          selectedTxIds,
+          totalFees,
+        },
+        includedTxCount: mempoolTxs.length,
+        totalFees,
+        reward: currentReward,
+        halvingEvent,
+      });
+    }
+
+    // Action: Update Phase 8 auto-mine settings (teacher only)
+    if (action === 'update-phase8-settings') {
+      const { autoMineInterval, autoMineCapacity } = body;
+
+      const updates: { autoMineInterval?: number; autoMineCapacity?: number } = {};
+
+      if (autoMineInterval !== undefined) {
+        if (autoMineInterval < 10 || autoMineInterval > 60) {
+          return NextResponse.json({
+            error: 'Invalid auto-mine interval. Must be between 10 and 60 seconds'
+          }, { status: 400 });
+        }
+        updates.autoMineInterval = autoMineInterval;
+      }
+
+      if (autoMineCapacity !== undefined) {
+        if (autoMineCapacity < 1 || autoMineCapacity > 8) {
+          return NextResponse.json({
+            error: 'Invalid auto-mine capacity. Must be between 1 and 8 transactions'
+          }, { status: 400 });
+        }
+        updates.autoMineCapacity = autoMineCapacity;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return NextResponse.json({
+          error: 'No valid settings to update'
+        }, { status: 400 });
+      }
+
+      store.updateRoom(roomId, updates);
+      const updatedRoom = store.getRoomById(roomId)!.room;
+
+      if (roomCode) broadcastRoomUpdate(roomCode);
+      return NextResponse.json({
+        success: true,
+        settings: {
+          autoMineInterval: updatedRoom.autoMineInterval,
+          autoMineCapacity: updatedRoom.autoMineCapacity,
+        }
+      });
     }
 
     // Action: Force immediate halving (teacher only) - Phase 8

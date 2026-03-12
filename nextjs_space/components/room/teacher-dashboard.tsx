@@ -88,6 +88,8 @@ interface TeacherDashboardProps {
   // Phase 8
   onForceHalving?: () => Promise<{ success: boolean; previousReward?: number; newReward?: number; error?: string }>;
   onUpdateHalvingSettings?: (settings: { halvingInterval?: number; blockReward?: number }) => Promise<{ success: boolean; error?: string }>;
+  autoMineSettings?: { autoMineInterval: number; autoMineCapacity: number };
+  onUpdatePhase8Settings?: (settings: { autoMineInterval?: number; autoMineCapacity?: number }) => Promise<{ success: boolean; error?: string }>;
   // Phase 9
   simulationStats?: SimulationStats | null;
   onStartSimulation?: () => Promise<{ success: boolean; error?: string }>;
@@ -144,6 +146,8 @@ export default function TeacherDashboard({
   onDeletePool,
   onForceHalving,
   onUpdateHalvingSettings,
+  autoMineSettings = { autoMineInterval: 20, autoMineCapacity: 3 },
+  onUpdatePhase8Settings,
   // Phase 9
   simulationStats,
   onStartSimulation,
@@ -1829,136 +1833,234 @@ export default function TeacherDashboard({
         </div>
       )}
 
-      {/* Phase 8 Economic Incentives Control Panel */}
-      {currentPhase === 8 && halvingInfo && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="zone-card phase-panel-yellow"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-yellow-600" />
-              <h2 className="font-semibold text-heading">{t('phase8InstructionTitle')}</h2>
-            </div>
-          </div>
+      {/* Phase 8 Fee Market Control Panel */}
+      {currentPhase === 8 && (() => {
+        const phase8MinedBlocks = blocks.filter(b => b.status === 'mined').sort((a, b) => a.blockNumber - b.blockNumber);
+        const phase8DisplayBlocks = phase8MinedBlocks.slice(-10);
+        const pendingTxCount = mempoolTransactions?.filter(tx => tx.status === 'in_mempool').length ?? 0;
 
-          {/* Halving Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase8.currentReward')}</p>
-              <p className="font-semibold text-yellow-600 text-xl">{halvingInfo.currentBlockReward} BTC</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase8.blocksToHalving')}</p>
-              <p className="font-semibold text-orange-600 text-xl">{halvingInfo.blocksUntilNextHalving}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase8.nextReward')}</p>
-              <p className="font-semibold text-red-600 text-xl">{halvingInfo.nextReward.toFixed(2)} BTC</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase8.totalEmitted')}</p>
-              <p className="font-semibold text-green-600 text-xl">{halvingInfo.totalBtcEmitted.toFixed(1)} / {halvingInfo.maxBtc}</p>
-            </div>
-          </div>
+        return (
+          <>
+            {/* Blockchain visualization — same as student view */}
+            {phase8DisplayBlocks.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="zone-card"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Pickaxe className="w-4 h-4 text-heading" />
+                  <h2 className="text-sm font-semibold text-heading">{t('phase6.blockchain')}</h2>
+                  <span className="text-xs text-muted ml-auto">{phase8MinedBlocks.length} {t('phase8.blocksMinedCount')}</span>
+                </div>
 
-          {/* Economic Stats */}
-          {economicStats && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="p-3 bg-surface rounded-lg">
-                <p className="text-xs text-muted">{t('phase8.avgFee')}</p>
-                <p className="font-semibold text-blue-600 text-xl">{economicStats.averageFee} BTC</p>
-              </div>
-              <div className="p-3 bg-surface rounded-lg">
-                <p className="text-xs text-muted">{t('phase8.totalFeesPaid')}</p>
-                <p className="font-semibold text-purple-600 text-xl">{economicStats.totalFeesPaid} BTC</p>
-              </div>
-              <div className="p-3 bg-surface rounded-lg">
-                <p className="text-xs text-muted">{t('phase8.totalBlockRewards')}</p>
-                <p className="font-semibold text-indigo-600 text-xl">{economicStats.totalBlockRewardsPaid} BTC</p>
-              </div>
-            </div>
-          )}
+                <div className="flex gap-3 overflow-x-auto pb-2" ref={(el) => {
+                  if (el) el.scrollLeft = el.scrollWidth;
+                }}>
+                  {phase8DisplayBlocks.map((block) => {
+                    const txs = (() => { try { return JSON.parse(block.transactionsRaw || '[]'); } catch { return Array.isArray(block.transactions) ? block.transactions : []; } })();
+                    const isGenesis = block.blockNumber === 1;
+                    return (
+                      <div
+                        key={block.id}
+                        className={`flex-shrink-0 w-44 rounded-lg border p-2.5 ${
+                          isGenesis
+                            ? 'border-amber-300/50 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-900/10'
+                            : 'border-default bg-surface-alt'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                            #{block.blockNumber}
+                          </span>
+                          <span className="text-[10px] text-muted">
+                            {block.reward} + {(block.totalFees || 0).toFixed(1)} BTC
+                          </span>
+                        </div>
 
-          {/* Miner Earnings Ranking */}
-          {economicStats && economicStats.minerEarnings.length > 0 && (
-            <div className="mb-4">
-              <h3 className="font-medium text-body mb-2">{t('phase8.minerEarnings')}</h3>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {economicStats.minerEarnings.map((miner, idx) => (
-                  <div key={miner.minerId} className={`p-2 rounded text-sm ${idx === 0 ? 'bg-yellow-100 dark:bg-yellow-500/20' : 'bg-surface-alt'}`}>
-                    <span className="font-medium">{idx + 1}. {miner.minerName}:</span>{' '}
-                    <span className="text-yellow-600">{miner.blockRewards} BTC</span>{' '}
-                    <span className="text-muted">({t('phase8.rewards')})</span> +{' '}
-                    <span className="text-green-600">{miner.fees} BTC</span>{' '}
-                    <span className="text-muted">({t('phase8.fees')})</span> ={' '}
-                    <span className="font-bold text-orange-600">{miner.total} BTC</span>
+                        {txs.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {txs.map((tx: { sender: string; receiver: string; amount: number; fee?: number }, i: number) => (
+                              <div key={i} className="flex items-center gap-1 text-[10px]">
+                                <span className="text-secondary truncate max-w-[40px]">{tx.sender}</span>
+                                <span className="text-muted">→</span>
+                                <span className="text-secondary truncate max-w-[40px]">{tx.receiver}</span>
+                                {tx.fee !== undefined && (
+                                  <span className="ml-auto text-green-600 dark:text-green-400 font-medium">{tx.fee}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-muted text-center py-1">
+                            {isGenesis ? 'Genesis' : '0 tx'}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Two-column layout: Controls (left) + Mempool (right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column: Controls */}
+              <div className="space-y-4">
+                <div className="zone-card">
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="w-5 h-5 text-heading" />
+                    <h2 className="font-semibold text-heading">{t('phase8InstructionTitle')}</h2>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Demo Controls */}
-          <div className="p-4 bg-surface rounded-lg border border-yellow-200 dark:border-yellow-500/30">
-            <h3 className="font-medium text-body mb-3">{t('phase8.demoControls')}</h3>
-            <div className="space-y-4">
-              {/* Force Halving */}
-              <div>
-                <p className="text-sm text-secondary mb-2">{t('phase8.forceHalving')}</p>
-                <button
-                  onClick={async () => {
-                    setForcingHalving(true);
-                    await onForceHalving?.();
-                    setForcingHalving(false);
-                  }}
-                  disabled={forcingHalving || halvingInfo.currentBlockReward < 0.1}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  🔥 {t('phase8.triggerHalving')} ({halvingInfo.currentBlockReward} → {(halvingInfo.currentBlockReward / 2).toFixed(2)} BTC)
-                </button>
-              </div>
+                  {/* Auto-mine settings */}
+                  <div className="grid grid-cols-1 gap-4 mb-4">
+                    <div className="p-3 bg-surface-alt rounded-lg">
+                      <p className="text-xs text-muted mb-2">{t('phase8.blockInterval')}</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="10"
+                          max="60"
+                          step="5"
+                          value={autoMineSettings.autoMineInterval}
+                          onChange={(e) => onUpdatePhase8Settings?.({ autoMineInterval: parseInt(e.target.value) })}
+                          className="flex-1 accent-amber-500"
+                        />
+                        <span className="text-sm font-bold text-heading w-10 text-right">{autoMineSettings.autoMineInterval}s</span>
+                      </div>
+                    </div>
 
-              {/* Change Block Reward */}
-              <div>
-                <p className="text-sm text-secondary mb-2">{t('phase8.changeBlockReward')}</p>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="number"
-                    min="0.01"
-                    max="100"
-                    step="0.1"
-                    value={newBlockReward}
-                    onChange={(e) => setNewBlockReward(parseFloat(e.target.value) || 50)}
-                    className="w-24 px-2 py-1.5 border border-default rounded-lg text-sm dark:bg-zinc-700 dark:text-zinc-100"
-                  />
-                  <span className="text-sm text-muted">BTC</span>
-                  <button
-                    onClick={async () => {
-                      await onUpdateHalvingSettings?.({ blockReward: newBlockReward });
-                    }}
-                    className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium transition-colors"
-                  >
-                    {t('phase8.apply')}
-                  </button>
+                    <div className="p-3 bg-surface-alt rounded-lg">
+                      <p className="text-xs text-muted mb-2">{t('phase8.blockCapacity')}</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="1"
+                          max="8"
+                          step="1"
+                          value={autoMineSettings.autoMineCapacity}
+                          onChange={(e) => onUpdatePhase8Settings?.({ autoMineCapacity: parseInt(e.target.value) })}
+                          className="flex-1 accent-amber-500"
+                        />
+                        <span className="text-sm font-bold text-heading w-10 text-right">{autoMineSettings.autoMineCapacity} tx</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mempool count */}
+                  <div className="p-3 bg-surface-alt rounded-lg mb-4">
+                    <p className="text-xs text-muted">{t('phase8.mempoolTxs')}</p>
+                    <p className="font-semibold text-heading text-xl">
+                      {pendingTxCount} tx {t('phase8.pending')}
+                    </p>
+                  </div>
+
+                  {/* Demo Controls */}
+                  <div className="p-4 bg-surface-alt rounded-lg">
+                    <h3 className="font-medium text-body mb-3">{t('phase8.demoControls')}</h3>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => onFillMempool?.(15)}
+                        className="px-4 py-2 bg-zinc-700 hover:bg-zinc-800 dark:bg-zinc-600 dark:hover:bg-zinc-500 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {t('phase8.addTxWithFees')}
+                      </button>
+
+                      {halvingInfo && (
+                        <button
+                          onClick={async () => {
+                            setForcingHalving(true);
+                            await onForceHalving?.();
+                            setForcingHalving(false);
+                          }}
+                          disabled={forcingHalving || halvingInfo.currentBlockReward < 0.1}
+                          className="px-4 py-2 bg-zinc-700 hover:bg-zinc-800 dark:bg-zinc-600 dark:hover:bg-zinc-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                        >
+                          {t('phase8.triggerHalving')} ({halvingInfo.currentBlockReward} → {(halvingInfo.currentBlockReward / 2).toFixed(2)} BTC)
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Fill Mempool with varying fees */}
-              <div>
-                <p className="text-sm text-secondary mb-2">{t('phase8.fillMempoolWithFees')}</p>
-                <button
-                  onClick={() => onFillMempool?.(15)}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  📨 {t('phase8.addTxWithFees')}
-                </button>
+              {/* Right Column: Mempool viewer (same as student view) */}
+              <div className="space-y-4">
+                <div className="zone-card">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-heading" />
+                      <h2 className="text-sm font-semibold text-heading">Mempool</h2>
+                    </div>
+                    <span className="text-xs text-muted">
+                      {pendingTxCount} tx {t('phase8.pending')}
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const pendingTxs = (mempoolTransactions || [])
+                      .filter(tx => tx.status === 'in_mempool')
+                      .sort((a, b) => b.fee - a.fee);
+                    const cap = autoMineSettings.autoMineCapacity;
+
+                    if (pendingTxs.length === 0) {
+                      return (
+                        <div className="text-center text-muted py-6 text-sm">
+                          {t('phase8.noTxInMempool')}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-1 max-h-80 overflow-y-auto">
+                        {pendingTxs.map((tx, idx) => {
+                          const willEnter = idx < cap;
+                          return (
+                            <div key={tx.id}>
+                              {idx === cap && (
+                                <div className="flex items-center gap-2 py-1.5 my-1">
+                                  <div className="flex-1 border-t-2 border-dashed border-red-300 dark:border-red-700" />
+                                  <span className="text-[10px] text-red-500 font-medium">
+                                    {t('phase8.wontEnterNextBlock')}
+                                  </span>
+                                  <div className="flex-1 border-t-2 border-dashed border-red-300 dark:border-red-700" />
+                                </div>
+                              )}
+                              <div className={`flex items-center gap-2 p-2 rounded-lg text-xs ${
+                                willEnter ? 'bg-green-50/50 dark:bg-green-900/10' : 'bg-surface-alt'
+                              }`}>
+                                <span className="text-secondary font-medium">{tx.sender?.name || '?'}</span>
+                                <span className="text-muted">→</span>
+                                <span className="text-secondary truncate">{tx.receiver?.name || '?'}</span>
+                                <span className="text-muted">({tx.amount})</span>
+                                <span className={`ml-auto font-bold tabular-nums ${
+                                  willEnter ? 'text-green-600 dark:text-green-400' : 'text-muted'
+                                }`}>
+                                  {tx.fee} BTC
+                                </span>
+                                {willEnter && <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Legend */}
+                  <div className="flex items-center gap-4 mt-3 pt-2 border-t border-default text-[10px] text-muted">
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                      <span>{t('phase8.willEnterNextBlock')}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </motion.div>
-      )}
+          </>
+        );
+      })()}
 
       {/* Phase 9 Free Simulation Control Panel */}
       {currentPhase === 9 && (

@@ -24,6 +24,8 @@ export interface RoomData {
   challengeData: string | null;
   simulationStarted: boolean;
   poolsEnabled: boolean;
+  autoMineInterval: number;   // Phase 8: seconds between auto-mined blocks (15-60)
+  autoMineCapacity: number;   // Phase 8: max tx per auto-mined block (2-5)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -235,6 +237,8 @@ function createRoomState(code: string): RoomState {
       challengeData: null,
       simulationStarted: false,
       poolsEnabled: false,
+      autoMineInterval: 20,
+      autoMineCapacity: 3,
       createdAt: now,
       updatedAt: now,
     },

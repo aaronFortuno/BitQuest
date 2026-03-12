@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 // Used by both students (senderId = themselves) and teacher (originNodeId = any node)
 export async function POST(request: NextRequest) {
   try {
-    const { roomId, senderId, receiverId, amount, originNodeId } = await request.json();
+    const { roomId, senderId, receiverId, amount, fee, originNodeId } = await request.json();
 
     if (!roomId || !receiverId || amount === undefined) {
       return NextResponse.json(
@@ -74,17 +74,21 @@ export async function POST(request: NextRequest) {
 
     const txId = generateMempoolTxId(roomId);
 
-    // Create the mempool transaction with initial status "propagating"
-    // fee is always 0 in Phase 5 (fees removed from this phase)
+    // Phase 8+: skip propagation, tx goes directly to mempool with fee
+    // Phase 5-7: propagation through node network
+    const roomState = store.getRoomById(roomId);
+    const currentPhase = roomState?.room.currentPhase ?? 5;
+    const skipPropagation = currentPhase >= 8;
+
     const mempoolTx = store.createMempoolTransaction(roomId, {
       txId,
       senderId: effectiveSenderId,
       receiverId,
       amount,
-      fee: 0,
-      status: 'propagating',
+      fee: typeof fee === 'number' ? fee : 0,
+      status: skipPropagation ? 'in_mempool' : 'propagating',
       propagatedTo: [effectiveSenderId],
-      propagationProgress: 0,
+      propagationProgress: skipPropagation ? 100 : 0,
       propagationColor: nextTxColor(),
     });
 
@@ -94,8 +98,10 @@ export async function POST(request: NextRequest) {
       receiver: store.getParticipant(receiverId) || null,
     };
 
-    // Start BFS propagation through the connection graph (async)
-    simulateGraphPropagation(mempoolTx.id, roomId, effectiveSenderId);
+    // Only propagate through network in phases that have nodes
+    if (!skipPropagation) {
+      simulateGraphPropagation(mempoolTx.id, roomId, effectiveSenderId);
+    }
 
     const roomCode = store.getRoomCodeById(roomId);
     if (roomCode) broadcastRoomUpdate(roomCode);

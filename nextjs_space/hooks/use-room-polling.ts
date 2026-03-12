@@ -56,6 +56,8 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   // Phase 7: Mining pools
   const [miningPools, setMiningPools] = useState<MiningPool[]>([]);
   const [poolsEnabled, setPoolsEnabled] = useState(false);
+  // Phase 8: Auto-mine settings
+  const [autoMineSettings, setAutoMineSettings] = useState<{ autoMineInterval: number; autoMineCapacity: number }>({ autoMineInterval: 20, autoMineCapacity: 3 });
   // Phase 9: Free simulation
   const [simulationStats, setSimulationStats] = useState<SimulationStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -795,7 +797,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
             senderId: students[senderIdx].id,
             receiverId: students[receiverIdx].id,
             amount: Math.floor(Math.random() * 10) + 1,
-            fee: Math.floor(Math.random() * 3),
+            fee: Math.round((Math.random() * 4.9 + 0.1) * 10) / 10, // 0.1 to 5.0 BTC fees
           }),
         });
       } catch (err) {
@@ -883,6 +885,9 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       }
       if (data.economicStats) {
         setEconomicStats(data.economicStats);
+      }
+      if (data.autoMineSettings) {
+        setAutoMineSettings(data.autoMineSettings);
       }
     } catch (err) {
       console.error('Fetch blocks error:', err);
@@ -1418,6 +1423,76 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, fetchBlocks, fetchRoom]);
 
+  // Phase 8: Trigger auto-mine tick (system mines a block with top-fee txs)
+  const autoMineTick = useCallback(async (): Promise<{
+    success: boolean;
+    includedTxCount?: number;
+    totalFees?: number;
+    halvingEvent?: { previousReward: number; newReward: number };
+    error?: string;
+  }> => {
+    if (!room) return { success: false, error: 'No room' };
+
+    try {
+      const res = await fetch(apiUrl('/api/blocks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'auto-mine-tick',
+          roomId: room.id,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error };
+      }
+
+      await fetchBlocks();
+      await fetchMempoolTransactions();
+      return {
+        success: true,
+        includedTxCount: data.includedTxCount,
+        totalFees: data.totalFees,
+        halvingEvent: data.halvingEvent,
+      };
+    } catch (err) {
+      console.error('Auto-mine tick error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, fetchBlocks, fetchMempoolTransactions]);
+
+  // Phase 8: Update auto-mine settings (teacher only)
+  const updatePhase8Settings = useCallback(async (settings: {
+    autoMineInterval?: number;
+    autoMineCapacity?: number;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!room) return { success: false, error: 'No room' };
+
+    try {
+      const res = await fetch(apiUrl('/api/blocks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update-phase8-settings',
+          roomId: room.id,
+          ...settings,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error };
+      }
+
+      await fetchBlocks();
+      return { success: true };
+    } catch (err) {
+      console.error('Update Phase 8 settings error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, fetchBlocks]);
+
   // Phase 9: Fetch simulation statistics
   const fetchSimulationStats = useCallback(async () => {
     const rid = roomUuidRef.current;
@@ -1813,6 +1888,9 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     selectTransactionsForBlock,
     forceHalving,
     updateHalvingSettings,
+    autoMineTick,
+    updatePhase8Settings,
+    autoMineSettings,
     // Phase 9
     startSimulation,
     resetSimulation,

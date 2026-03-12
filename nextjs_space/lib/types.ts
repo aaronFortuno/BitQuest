@@ -79,6 +79,9 @@ export interface Room {
   simulationStarted?: boolean;
   // Phase 7: Mining pools
   poolsEnabled?: boolean;
+  // Phase 8: Auto-mining settings
+  autoMineInterval?: number;   // seconds between auto-mined blocks
+  autoMineCapacity?: number;   // max tx per auto-mined block
   participants: Participant[];
   transactions: Transaction[];
 }

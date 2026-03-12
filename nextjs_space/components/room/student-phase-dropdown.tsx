@@ -21,6 +21,8 @@ export default function StudentPhaseDropdown({ currentPhase, isOpen, onClose }: 
     4: { key: 'phase4Student', activityCount: 4 },
     5: { key: 'phase5Student', activityCount: 4 },
     6: { key: 'phase6Student', activityCount: 4 },
+    7: { key: 'phase7Student', activityCount: 4 },
+    8: { key: 'phase8Student', activityCount: 3 },
     9: { key: 'phase9Student', activityCount: 5 },
   };
 
