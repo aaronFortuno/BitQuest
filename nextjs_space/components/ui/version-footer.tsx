@@ -5,9 +5,60 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.6';
+const VERSION = 'v0.4.7';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.7',
+    date: '2026-03-12',
+    changes: {
+      ca: [
+        'Fase 7: Ajust de la Dificultat — auto-mining i dificultat granular',
+        'Màquines de minatge automàtic (1-3 rigs per alumne, velocitats 4/8/20 h/s)',
+        'Hashing client-side amb SHA-256 (Web Crypto API) sense saturar el servidor',
+        'Dificultat target-based: hash hex inferior a un objectiu (ex: 00F2) en lloc de zeros inicials',
+        'Ajust automàtic de dificultat ratio-based cada N blocs, com a Bitcoin real',
+        'Controls per alumne: el professor pot desbloquejar rigs i millores individualment',
+        'Dashboard docent: historial de períodes + estadístiques 2×2 + selector temps objectiu 15s/30s',
+        'Comptador en temps real del temps des de l\'últim bloc minat',
+        'Dificultat estimada del pròxim període visible a professor i alumne',
+        'Interfície alumne: panells "Ajust de dificultat" i "Estat del node" costat a costat',
+        'Instruccions de fase amb preguntes d\'experimentació per als alumnes',
+        'Recompensa fixa a 50 BTC (halving reservat per a la Fase 8)',
+        'Fix hashrate total de la xarxa (ara reflecteix correctament miners actius)',
+      ],
+      es: [
+        'Fase 7: Ajuste de la Dificultad — auto-mining y dificultad granular',
+        'Máquinas de minado automático (1-3 rigs por alumno, velocidades 4/8/20 h/s)',
+        'Hashing client-side con SHA-256 (Web Crypto API) sin saturar el servidor',
+        'Dificultad target-based: hash hex inferior a un objetivo (ej: 00F2) en lugar de ceros iniciales',
+        'Ajuste automático de dificultad ratio-based cada N bloques, como Bitcoin real',
+        'Controles por alumno: el profesor puede desbloquear rigs y mejoras individualmente',
+        'Dashboard docente: historial de períodos + estadísticas 2×2 + selector tiempo objetivo 15s/30s',
+        'Contador en tiempo real del tiempo desde el último bloque minado',
+        'Dificultad estimada del próximo período visible para profesor y alumno',
+        'Interfaz alumno: paneles "Ajuste de dificultad" y "Estado del nodo" lado a lado',
+        'Instrucciones de fase con preguntas de experimentación para los alumnos',
+        'Recompensa fija en 50 BTC (halving reservado para la Fase 8)',
+        'Fix hashrate total de la red (ahora refleja correctamente mineros activos)',
+      ],
+      en: [
+        'Phase 7: Difficulty Adjustment — auto-mining and granular difficulty',
+        'Automatic mining machines (1-3 rigs per student, speeds 4/8/20 h/s)',
+        'Client-side SHA-256 hashing (Web Crypto API) without overloading the server',
+        'Target-based difficulty: hex hash below a target (e.g., 00F2) instead of leading zeros',
+        'Ratio-based automatic difficulty adjustment every N blocks, like real Bitcoin',
+        'Per-student controls: teacher can unlock rigs and upgrades individually',
+        'Teacher dashboard: period history + 2×2 stats + target time selector 15s/30s',
+        'Real-time counter of time since last mined block',
+        'Estimated next period difficulty visible to teacher and student',
+        'Student interface: "Difficulty Adjustment" and "Node Status" panels side by side',
+        'Phase instructions with experimentation questions for students',
+        'Fixed reward at 50 BTC (halving reserved for Phase 8)',
+        'Fix total network hashrate (now correctly reflects active miners)',
+      ],
+    },
+  },
   {
     version: 'v0.4.6',
     date: '2026-03-12',
