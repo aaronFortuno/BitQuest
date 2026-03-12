@@ -32,12 +32,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         p.blocksMinedCount = 0;
         p.totalMiningReward = 0;
         p.hashAttempts = 0;
+        p.activeRigs = 1;
+        p.rigSpeed = 4;
+        p.maxRigs = 1;
+        p.allowUpgrade = false;
       }
 
       store.updateRoom(id, {
         currentBlockReward: 50,
         totalBtcEmitted: 0,
         currentDifficulty: 2,
+        miningTarget: 4096,
       });
 
       // Revert confirmed mempool transactions

@@ -10,6 +10,7 @@ import { generateRSAKeyPair, serializePublicKey } from '@/lib/crypto';
 // Difficulty info from API
 export interface DifficultyInfo {
   currentDifficulty: number;
+  miningTarget?: number;
   targetBlockTime: number;
   adjustmentInterval: number;
   currentPeriod: number;
@@ -1136,6 +1137,69 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, fetchBlocks, fetchRoom]);
 
+  // Phase 7: Update rig settings per-participant (teacher only)
+  const updateRigSettings = useCallback(async (targetParticipantId: string, settings: {
+    maxRigs?: number;
+    allowUpgrade?: boolean;
+  }): Promise<void> => {
+    if (!room) return;
+    try {
+      await fetch(apiUrl('/api/blocks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update-rig-settings',
+          roomId: room.id,
+          participantId: targetParticipantId,
+          ...settings,
+        }),
+      });
+      await fetchRoom();
+    } catch (err) {
+      console.error('Update rig settings error:', err);
+    }
+  }, [room, fetchRoom]);
+
+  // Phase 7: Batch hash update (auto-mining stats)
+  const batchHashUpdate = useCallback(async (hashCount: number, activeRigs?: number): Promise<void> => {
+    if (!room || !participantId) return;
+    try {
+      await fetch(apiUrl('/api/blocks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'batch-hash-update',
+          roomId: room.id,
+          minerId: participantId,
+          hashCount,
+          activeRigs,
+        }),
+      });
+    } catch (err) {
+      console.error('Batch hash update error:', err);
+    }
+  }, [room, participantId]);
+
+  // Phase 7: Upgrade rig speed (student)
+  const upgradeRig = useCallback(async (newSpeed: number): Promise<void> => {
+    if (!room || !participantId) return;
+    try {
+      await fetch(apiUrl('/api/blocks'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upgrade-rig',
+          roomId: room.id,
+          participantId,
+          newSpeed,
+        }),
+      });
+      await fetchRoom();
+    } catch (err) {
+      console.error('Upgrade rig error:', err);
+    }
+  }, [room, participantId, fetchRoom]);
+
   // Phase 8: Select transactions for block (miner selects which txs to include)
   const selectTransactionsForBlock = useCallback(async (txIds: string[]): Promise<{
     success: boolean;
@@ -1617,6 +1681,9 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     toggleMining,
     forceDifficultyAdjustment,
     updateDifficultySettings,
+    updateRigSettings,
+    batchHashUpdate,
+    upgradeRig,
     // Phase 8
     selectTransactionsForBlock,
     forceHalving,

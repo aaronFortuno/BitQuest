@@ -22,6 +22,8 @@ export default function InstructionsPanel({ currentPhase, isOpen, onClose }: Ins
       4: { titleKey: 'phase4', activityCount: 4 },
       5: { titleKey: 'phase5', activityCount: 4 },
       6: { titleKey: 'phase6', activityCount: 4 },
+      7: { titleKey: 'phase7', activityCount: 4 },
+      8: { titleKey: 'phase8', activityCount: 3 },
       9: { titleKey: 'phase9', activityCount: 5 },
     };
 

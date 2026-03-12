@@ -21,6 +21,11 @@ export interface Participant {
   blocksMinedCount?: number;
   totalMiningReward?: number;
   hashAttempts?: number;
+  // Phase 7: Auto-mining rig settings
+  activeRigs?: number;       // 1-3
+  rigSpeed?: number;         // 4, 8, or 20 h/s
+  maxRigs?: number;          // 1-3, per-student control
+  allowUpgrade?: boolean;    // per-student control
   // Phase 9: Free simulation
   simulationRole?: 'user' | 'miner' | 'both';
   simulationBalance?: number;
@@ -64,6 +69,8 @@ export interface Room {
   totalBtcEmitted: number;
   // Phase 5: Network control
   studentSendingEnabled?: boolean;
+  // Phase 7: Target-based difficulty (granular)
+  miningTarget?: number;     // hash target (first 4 hex chars < target). Lower = harder.
   // Phase 9: Free simulation
   activeChallenge?: string | null;
   challengeData?: string | null;
@@ -188,8 +195,10 @@ export interface Block {
   miner?: Participant | null;
   reward: number;
   difficulty: number;
+  miningTarget?: number;     // Phase 7+: target-based difficulty
   status: 'pending' | 'mining' | 'mined';
   transactions: BlockTransaction[];
+  transactionsRaw?: string;   // Raw JSON string for client-side hashing
   hashAttempts: number;
   // Phase 8: Economic incentives
   selectedTxIds: string[];

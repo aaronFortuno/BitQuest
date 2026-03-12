@@ -13,10 +13,16 @@ function calculateHash(blockContent: string, nonce: number): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
-// Check if hash meets difficulty requirement (leading zeros)
+// Phase 6: Check if hash meets difficulty requirement (leading zeros)
 function isValidHash(hash: string, difficulty: number): boolean {
   const target = '0'.repeat(difficulty);
   return hash.startsWith(target);
+}
+
+// Phase 7+: Target-based difficulty check (first 4 hex chars < target)
+function isValidHashTarget(hash: string, miningTarget: number): boolean {
+  const hashPrefix = parseInt(hash.substring(0, 4), 16);
+  return hashPrefix < miningTarget;
 }
 
 // Calculate halving info
@@ -63,7 +69,7 @@ function generateBlockTransactions(participants: { id: string; name: string }[])
   return JSON.stringify(transactions);
 }
 
-// Calculate difficulty adjustment based on period statistics
+// Phase 6: Calculate difficulty adjustment (integer leading zeros)
 function calculateDifficultyAdjustment(
   avgTimePerBlock: number,
   targetTimePerBlock: number,
@@ -88,6 +94,32 @@ function calculateDifficultyAdjustment(
       adjustmentResult: newDifficulty < currentDifficulty ? 'decreased' : 'stable'
     };
   }
+}
+
+// Phase 7+: Target-based difficulty adjustment (granular, ratio-based like real Bitcoin)
+function calculateTargetAdjustment(
+  avgTimePerBlock: number,
+  targetTimePerBlock: number,
+  currentTarget: number
+): { newTarget: number; adjustmentResult: 'increased' | 'decreased' | 'stable' } {
+  const ratio = avgTimePerBlock / targetTimePerBlock;
+
+  if (ratio >= 0.85 && ratio <= 1.15) {
+    return { newTarget: currentTarget, adjustmentResult: 'stable' };
+  }
+
+  // New target = current * ratio (if blocks are slow, target goes up = easier)
+  // Clamp adjustment to 4x max change per period
+  const clampedRatio = Math.max(0.25, Math.min(4, ratio));
+  const newTarget = Math.round(currentTarget * clampedRatio);
+  const clamped = Math.max(1, Math.min(65535, newTarget));
+
+  if (clamped < currentTarget) {
+    return { newTarget: clamped, adjustmentResult: 'increased' }; // harder
+  } else if (clamped > currentTarget) {
+    return { newTarget: clamped, adjustmentResult: 'decreased' }; // easier
+  }
+  return { newTarget: clamped, adjustmentResult: 'stable' };
 }
 
 // Get period info for a given block number
@@ -123,6 +155,7 @@ export async function GET(request: NextRequest) {
     const parsedBlocks = blocks.map(block => ({
       ...block,
       miner: block.minerId ? store.getParticipant(block.minerId) || null : null,
+      transactionsRaw: block.transactions,
       transactions: JSON.parse(block.transactions || '[]'),
       selectedTxIds: block.selectedTxIds || [],
       totalFees: block.totalFees || 0
@@ -247,6 +280,7 @@ export async function GET(request: NextRequest) {
       blocks: parsedBlocks,
       difficultyInfo: {
         currentDifficulty: room.currentDifficulty,
+        miningTarget: room.miningTarget,
         targetBlockTime: room.targetBlockTime,
         adjustmentInterval: room.difficultyAdjustmentInterval,
         currentPeriod: periodInfo.periodNumber,
@@ -302,23 +336,32 @@ export async function POST(request: NextRequest) {
       }
 
       // Auto-calculate initial difficulty based on connected students
-      // Each student clicks ~2 times/sec. Target: ~30s per block.
-      // Expected attempts = 16^d. Time = 16^d / (numStudents * 2).
-      // d=1: 16 attempts → too fast for any class
-      // d=2: 256 attempts → 6-25s for 5-20 students (ideal)
-      // d=3: 4096 attempts → only viable for 40+ students
       const activeStudents = state.participants
         ? Array.from(state.participants.values()).filter(p => p.isActive && p.role === 'student').length
         : 0;
-      const clicksPerSecond = 2;
-      const targetSeconds = 30;
-      const optimalAttempts = targetSeconds * Math.max(activeStudents, 1) * clicksPerSecond;
-      const calculatedDifficulty = Math.max(1, Math.min(4,
-        Math.round(Math.log(optimalAttempts) / Math.log(16))
-      ));
 
-      // Update room difficulty to the calculated value
-      store.updateRoom(roomId, { currentDifficulty: calculatedDifficulty });
+      let calculatedDifficulty = 2;
+      let initialMiningTarget = 4096; // ~d1 equivalent
+
+      if (room.currentPhase >= 7) {
+        // Phase 7+: Target-based difficulty
+        // Estimate total hashrate: each student has 1 rig at 4 h/s initially
+        const estimatedHashrate = Math.max(activeStudents, 1) * 4;
+        const targetSeconds = room.targetBlockTime || 15;
+        // target = 65536 / (hashrate * blockTime)
+        initialMiningTarget = Math.round(65536 / (estimatedHashrate * targetSeconds));
+        initialMiningTarget = Math.max(1, Math.min(65535, initialMiningTarget));
+        store.updateRoom(roomId, { miningTarget: initialMiningTarget, currentDifficulty: calculatedDifficulty });
+      } else {
+        // Phase 6: Leading zeros difficulty
+        const clicksPerSecond = 2;
+        const targetSeconds = 30;
+        const optimalAttempts = targetSeconds * Math.max(activeStudents, 1) * clicksPerSecond;
+        calculatedDifficulty = Math.max(1, Math.min(4,
+          Math.round(Math.log(optimalAttempts) / Math.log(16))
+        ));
+        store.updateRoom(roomId, { currentDifficulty: calculatedDifficulty });
+      }
 
       const genesisHash = createHash('sha256')
         .update('1:0000000000000000:[]:0')
@@ -329,6 +372,7 @@ export async function POST(request: NextRequest) {
         previousHash: '0000000000000000',
         status: 'mined',
         difficulty: calculatedDifficulty,
+        miningTarget: initialMiningTarget,
         reward: 0,
         transactions: '[]',
         selectedTxIds: [],
@@ -361,6 +405,7 @@ export async function POST(request: NextRequest) {
           message: 'Pending block already exists',
           block: {
             ...existingPending,
+            transactionsRaw: existingPending.transactions,
             transactions: JSON.parse(existingPending.transactions || '[]'),
             selectedTxIds: existingPending.selectedTxIds || [],
             totalFees: existingPending.totalFees || 0
@@ -387,6 +432,7 @@ export async function POST(request: NextRequest) {
         previousHash,
         status: 'pending',
         difficulty: room.currentDifficulty,
+        miningTarget: room.miningTarget,
         reward: currentReward,
         transactions,
         selectedTxIds: [],
@@ -396,6 +442,7 @@ export async function POST(request: NextRequest) {
       if (roomCode) broadcastRoomUpdate(roomCode);
       return NextResponse.json({
         ...newBlock,
+        transactionsRaw: newBlock.transactions,
         transactions: JSON.parse(newBlock.transactions),
         selectedTxIds: [],
         totalFees: 0
@@ -476,7 +523,12 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      if (!isValidHash(hash, pendingBlock.difficulty)) {
+      // Phase 7+: use target-based check; Phase 6: leading zeros
+      const hashValid = pendingBlock.miningTarget && room.currentPhase >= 7
+        ? isValidHashTarget(hash, pendingBlock.miningTarget)
+        : isValidHash(hash, pendingBlock.difficulty);
+
+      if (!hashValid) {
         return NextResponse.json({
           error: 'Hash does not meet difficulty requirement',
           code: 'HASH_NOT_VALID'
@@ -537,10 +589,10 @@ export async function POST(request: NextRequest) {
       const newTotalEmitted = room.totalBtcEmitted + pendingBlock.reward;
       store.updateRoom(roomId, { totalBtcEmitted: newTotalEmitted });
 
-      // Phase 8: Check for halving
+      // Phase 8+: Check for halving (skip for Phase 7 — reward stays constant)
       let halvingEvent = null;
       const blockNumber = minedBlock.blockNumber;
-      if (blockNumber > 0 && blockNumber % halvingInterval === 0) {
+      if (room.currentPhase >= 8 && blockNumber > 0 && blockNumber % halvingInterval === 0) {
         const newReward = currentBlockReward / 2;
         if (newReward >= 0.01) {
           store.updateRoom(roomId, { currentBlockReward: newReward });
@@ -569,19 +621,41 @@ export async function POST(request: NextRequest) {
           );
           const avgTime = totalTime / (periodBlocks.length - 1);
 
-          const adjustment = calculateDifficultyAdjustment(avgTime, targetBlockTime, currentDifficulty);
+          const updatedRoom = store.getRoomById(roomId)!.room;
 
-          if (adjustment.newDifficulty !== currentDifficulty) {
-            store.updateRoom(roomId, { currentDifficulty: adjustment.newDifficulty });
+          if (updatedRoom.currentPhase >= 7) {
+            // Phase 7+: Target-based granular adjustment
+            const currentTarget = updatedRoom.miningTarget;
+            const targetAdj = calculateTargetAdjustment(avgTime, targetBlockTime, currentTarget);
 
-            difficultyAdjustment = {
-              previousDifficulty: currentDifficulty,
-              newDifficulty: adjustment.newDifficulty,
-              result: adjustment.adjustmentResult,
-              avgTimePerBlock: Math.round(avgTime),
-              targetTimePerBlock: targetBlockTime,
-              totalPeriodTime: totalTime
-            };
+            if (targetAdj.newTarget !== currentTarget) {
+              store.updateRoom(roomId, { miningTarget: targetAdj.newTarget });
+
+              difficultyAdjustment = {
+                previousDifficulty: currentTarget,
+                newDifficulty: targetAdj.newTarget,
+                result: targetAdj.adjustmentResult,
+                avgTimePerBlock: Math.round(avgTime),
+                targetTimePerBlock: targetBlockTime,
+                totalPeriodTime: totalTime
+              };
+            }
+          } else {
+            // Phase 6: Leading zeros adjustment
+            const adjustment = calculateDifficultyAdjustment(avgTime, targetBlockTime, currentDifficulty);
+
+            if (adjustment.newDifficulty !== currentDifficulty) {
+              store.updateRoom(roomId, { currentDifficulty: adjustment.newDifficulty });
+
+              difficultyAdjustment = {
+                previousDifficulty: currentDifficulty,
+                newDifficulty: adjustment.newDifficulty,
+                result: adjustment.adjustmentResult,
+                avgTimePerBlock: Math.round(avgTime),
+                targetTimePerBlock: targetBlockTime,
+                totalPeriodTime: totalTime
+              };
+            }
           }
         }
       }
@@ -636,13 +710,17 @@ export async function POST(request: NextRequest) {
 
       const blockContent = `${pendingBlock.blockNumber}:${pendingBlock.previousHash}:${pendingBlock.transactions}`;
       const calculatedHash = calculateHash(blockContent, nonce);
-      const valid = isValidHash(calculatedHash, pendingBlock.difficulty);
+
+      const valid = pendingBlock.miningTarget && room.currentPhase >= 7
+        ? isValidHashTarget(calculatedHash, pendingBlock.miningTarget)
+        : isValidHash(calculatedHash, pendingBlock.difficulty);
 
       return NextResponse.json({
         hash: calculatedHash,
         hashShort: calculatedHash.substring(0, 8).toUpperCase(),
         isValid: valid,
         difficulty: pendingBlock.difficulty,
+        miningTarget: pendingBlock.miningTarget,
         nonce,
         blockNumber: pendingBlock.blockNumber
       });
@@ -664,6 +742,7 @@ export async function POST(request: NextRequest) {
         currentBlockReward: 50,
         totalBtcEmitted: 0,
         currentDifficulty: 2,
+        miningTarget: 4096,
       });
 
       // Reset mempool transactions to in_mempool status
@@ -769,6 +848,87 @@ export async function POST(request: NextRequest) {
           currentDifficulty: updatedRoom.currentDifficulty,
         }
       });
+    }
+
+    // Action: Update rig settings per-participant (teacher only) - Phase 7
+    if (action === 'update-rig-settings') {
+      const { participantId, maxRigs, allowUpgrade } = body;
+
+      if (!participantId) {
+        return NextResponse.json({ error: 'participantId is required' }, { status: 400 });
+      }
+
+      const participant = store.getParticipant(participantId);
+      if (!participant) {
+        return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
+      }
+
+      const updates: Partial<{ maxRigs: number; allowUpgrade: boolean }> = {};
+
+      if (maxRigs !== undefined) {
+        if (maxRigs < 1 || maxRigs > 3) {
+          return NextResponse.json({ error: 'maxRigs must be 1-3' }, { status: 400 });
+        }
+        updates.maxRigs = maxRigs;
+      }
+      if (allowUpgrade !== undefined) {
+        updates.allowUpgrade = !!allowUpgrade;
+      }
+
+      store.updateParticipant(participantId, updates);
+      if (roomCode) broadcastRoomUpdate(roomCode);
+      return NextResponse.json({ success: true, participantId, ...updates });
+    }
+
+    // Action: Batch hash update (auto-mining) - Phase 7
+    if (action === 'batch-hash-update') {
+      const { hashCount, activeRigs: rigCount } = body;
+      if (!minerId || !hashCount) {
+        return NextResponse.json({ error: 'minerId and hashCount required' }, { status: 400 });
+      }
+
+      const miner = store.getParticipant(minerId);
+      if (miner) {
+        const pUpdates: Record<string, number> = {
+          hashAttempts: miner.hashAttempts + hashCount,
+        };
+        if (rigCount !== undefined) {
+          pUpdates.activeRigs = rigCount;
+        }
+        store.updateParticipant(minerId, pUpdates);
+      }
+
+      const blocks = store.getBlocksByRoom(roomId);
+      const pendingBlock = blocks.find(b => b.status === 'pending');
+      if (pendingBlock) {
+        store.updateBlock(pendingBlock.id, {
+          hashAttempts: pendingBlock.hashAttempts + hashCount,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        pendingBlockId: pendingBlock?.id || null,
+        pendingBlockStatus: pendingBlock?.status || null,
+      });
+    }
+
+    // Action: Upgrade rig speed (student) - Phase 7
+    if (action === 'upgrade-rig') {
+      const { participantId, newSpeed } = body;
+      if (!participantId || ![4, 8, 20].includes(newSpeed)) {
+        return NextResponse.json({ error: 'Invalid participantId or speed (4/8/20)' }, { status: 400 });
+      }
+      const participant = store.getParticipant(participantId);
+      if (!participant) {
+        return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
+      }
+      if (!participant.allowUpgrade) {
+        return NextResponse.json({ error: 'Upgrades not enabled for this student' }, { status: 403 });
+      }
+      store.updateParticipant(participantId, { rigSpeed: newSpeed });
+      if (roomCode) broadcastRoomUpdate(roomCode);
+      return NextResponse.json({ success: true, newSpeed });
     }
 
     // Action: Force immediate halving (teacher only) - Phase 8

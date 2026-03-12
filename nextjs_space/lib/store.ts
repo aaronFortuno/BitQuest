@@ -19,6 +19,7 @@ export interface RoomData {
   currentBlockReward: number;
   totalBtcEmitted: number;
   studentSendingEnabled: boolean;
+  miningTarget: number;
   activeChallenge: string | null;
   challengeData: string | null;
   simulationStarted: boolean;
@@ -43,6 +44,10 @@ export interface ParticipantData {
   blocksMinedCount: number;
   totalMiningReward: number;
   hashAttempts: number;
+  activeRigs: number;
+  rigSpeed: number;
+  maxRigs: number;
+  allowUpgrade: boolean;
   simulationRole: string;
   simulationBalance: number;
   totalEnergySpent: number;
@@ -147,6 +152,7 @@ export interface BlockData {
   minerId: string | null;
   reward: number;
   difficulty: number;
+  miningTarget: number;
   status: string;
   transactions: string;
   hashAttempts: number;
@@ -203,12 +209,13 @@ function createRoomState(code: string): RoomState {
       isBankDisconnected: false,
       maxTransferAmount: 5,
       difficultyAdjustmentInterval: 10,
-      targetBlockTime: 30,
+      targetBlockTime: 15,
       currentDifficulty: 2,
       halvingInterval: 20,
       currentBlockReward: 50,
       totalBtcEmitted: 0,
       studentSendingEnabled: false,
+      miningTarget: 4096,  // default: ~d=1 leading zeros
       activeChallenge: null,
       challengeData: null,
       simulationStarted: false,
@@ -293,6 +300,10 @@ export const store = {
       blocksMinedCount: data.blocksMinedCount || 0,
       totalMiningReward: data.totalMiningReward || 0,
       hashAttempts: data.hashAttempts || 0,
+      activeRigs: data.activeRigs ?? 0,
+      rigSpeed: data.rigSpeed || 4,
+      maxRigs: data.maxRigs || 1,
+      allowUpgrade: data.allowUpgrade || false,
       simulationRole: data.simulationRole || 'both',
       simulationBalance: data.simulationBalance ?? 100,
       totalEnergySpent: data.totalEnergySpent || 0,
@@ -638,6 +649,7 @@ export const store = {
       minerId: data.minerId ?? null,
       reward: data.reward ?? 50,
       difficulty: data.difficulty ?? 2,
+      miningTarget: data.miningTarget ?? 256,
       status: data.status || 'pending',
       transactions: data.transactions || '[]',
       hashAttempts: data.hashAttempts || 0,

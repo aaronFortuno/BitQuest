@@ -20,6 +20,8 @@ import Phase4UtxoPanel from '@/components/room/phase4-utxo-panel';
 import Phase4UserInterface from '@/components/room/phase4-user-interface';
 import Phase5UserInterface from '@/components/room/phase5-user-interface';
 import { Phase6UserInterface } from '@/components/room/phase6-user-interface';
+import { Phase7UserInterface } from '@/components/room/phase7-user-interface';
+import { useAutoMining } from '@/hooks/use-auto-mining';
 import { Phase8UserInterface } from '@/components/room/phase8-user-interface';
 import Phase9UserInterface from '@/components/room/phase9-user-interface';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -114,6 +116,9 @@ export default function RoomPage() {
     toggleMining,
     forceDifficultyAdjustment,
     updateDifficultySettings,
+    updateRigSettings,
+    batchHashUpdate,
+    upgradeRig,
     // Phase 8
     selectTransactionsForBlock,
     forceHalving,
@@ -152,6 +157,25 @@ export default function RoomPage() {
     }
   }, [roomPhase]);
 
+  // Derive participant info (needed before early returns for hook call order)
+  const currentParticipant = room?.participants?.find(
+    (p: Participant) => p.id === participantData?.id
+  );
+  const isTeacher = participantData?.role === 'teacher';
+  const currentPhase = room?.currentPhase ?? 0;
+  const viewPhase = studentViewPhase ?? currentPhase;
+
+  // Phase 7: Auto-mining hook (must be called before any early returns)
+  const autoMining = useAutoMining({
+    room,
+    participant: currentParticipant,
+    blocks,
+    enabled: viewPhase === 7 && !isTeacher && !!currentParticipant && !!room,
+    onCreatePendingBlock: createPendingBlock,
+    onSubmitBlock: submitMinedBlock,
+    onBatchHashUpdate: batchHashUpdate,
+  });
+
   const handleLeaveRoom = async () => {
     if (participantData?.id) {
       await fetch(apiUrl(`/api/participants/${participantData.id}`), {
@@ -179,12 +203,6 @@ export default function RoomPage() {
     );
   }
 
-  const currentParticipant = room.participants?.find(
-    (p: Participant) => p.id === participantData?.id
-  );
-  const isTeacher = participantData?.role === 'teacher';
-  const currentPhase = room.currentPhase ?? 0;
-
   // Parse student balance from coin file
   const studentBalance = (() => {
     if (isTeacher || !currentParticipant?.coinFile) return null;
@@ -195,9 +213,6 @@ export default function RoomPage() {
       return 10;
     }
   })();
-
-  // The phase the student is viewing (defaults to teacher's current phase)
-  const viewPhase = studentViewPhase ?? currentPhase;
 
   // Render student interface based on viewed phase
   const renderStudentInterface = () => {
@@ -293,7 +308,7 @@ export default function RoomPage() {
       );
     }
 
-    if (viewPhase === 6 || viewPhase === 7) {
+    if (viewPhase === 6) {
       return (
         <Phase6UserInterface
           room={room}
@@ -303,6 +318,24 @@ export default function RoomPage() {
           onCreatePendingBlock={createPendingBlock}
           onCalculateHash={calculateMiningHash}
           onSubmitBlock={submitMinedBlock}
+        />
+      );
+    }
+
+    if (viewPhase === 7) {
+      return (
+        <Phase7UserInterface
+          room={room}
+          participant={currentParticipant!}
+          blocks={blocks}
+          difficultyInfo={difficultyInfo}
+          rigs={autoMining.rigs}
+          totalHashrate={autoMining.totalHashrate}
+          isAnyMining={autoMining.isAnyMining}
+          lastBlockEvent={autoMining.lastBlockEvent}
+          onToggleRig={autoMining.toggleRig}
+          onUpgradeRig={upgradeRig}
+          onCreateGenesisBlock={createGenesisBlock}
         />
       );
     }
@@ -455,6 +488,7 @@ export default function RoomPage() {
             onToggleMining={toggleMining}
             onForceDifficultyAdjustment={forceDifficultyAdjustment}
             onUpdateDifficultySettings={updateDifficultySettings}
+            onUpdateRigSettings={updateRigSettings}
             onForceHalving={forceHalving}
             onUpdateHalvingSettings={updateHalvingSettings}
             // Phase 9
