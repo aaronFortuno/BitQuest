@@ -30,6 +30,8 @@ export interface Participant {
   simulationRole?: 'user' | 'miner' | 'both';
   simulationBalance?: number;
   totalEnergySpent?: number;
+  // Phase 7: Mining pools
+  poolId?: string | null;
 }
 
 export interface Transaction {
@@ -75,6 +77,8 @@ export interface Room {
   activeChallenge?: string | null;
   challengeData?: string | null;
   simulationStarted?: boolean;
+  // Phase 7: Mining pools
+  poolsEnabled?: boolean;
   participants: Participant[];
   transactions: Transaction[];
 }
@@ -203,6 +207,9 @@ export interface Block {
   // Phase 8: Economic incentives
   selectedTxIds: string[];
   totalFees: number;
+  // Phase 7: Mining pools
+  poolId?: string | null;
+  rewardDistribution?: RewardShare[] | null;
   createdAt: string;
   minedAt?: string | null;
 }
@@ -284,7 +291,28 @@ export interface ActivityLogEntry {
   participantId?: string;
 }
 
-export type SocketEventType = 
+// Phase 7: Mining Pools
+export interface MiningPool {
+  id: string;
+  roomId: string;
+  name: string;
+  creatorId: string;
+  memberIds: string[];
+  members?: Participant[];
+  colorHex: string;
+  totalHashrate: number;
+  createdAt: string;
+}
+
+export interface RewardShare {
+  participantId: string;
+  participantName: string;
+  hashrate: number;
+  sharePercent: number;
+  amount: number;
+}
+
+export type SocketEventType =
   | 'join-room'
   | 'leave-room'
   | 'participant-joined'

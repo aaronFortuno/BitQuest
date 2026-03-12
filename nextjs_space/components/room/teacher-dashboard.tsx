@@ -28,8 +28,9 @@ import {
   Link,
   Trophy,
   Pickaxe,
+  Users2,
 } from 'lucide-react';
-import { Room, Transaction, Participant, CoinFile, SignedMessage, UTXO, UTXOTransaction, UTXOOutput, MempoolTransaction, NodeConnection, Block, HalvingInfo, EconomicStats, SimulationStats, ChallengeType, ChallengeData } from '@/lib/types';
+import { Room, Transaction, Participant, CoinFile, SignedMessage, UTXO, UTXOTransaction, UTXOOutput, MempoolTransaction, NodeConnection, Block, HalvingInfo, EconomicStats, SimulationStats, ChallengeType, ChallengeData, MiningPool } from '@/lib/types';
 import { DifficultyInfo } from '@/hooks/use-room-polling';
 import { type RSAKeyPair, type KeyGenSteps } from '@/lib/crypto';
 import Phase3CryptoPanel from './phase3-crypto-panel';
@@ -79,6 +80,11 @@ interface TeacherDashboardProps {
   onForceDifficultyAdjustment?: (newDifficulty: number) => Promise<{ success: boolean; error?: string }>;
   onUpdateDifficultySettings?: (settings: { targetBlockTime?: number; adjustmentInterval?: number }) => Promise<{ success: boolean; error?: string }>;
   onUpdateRigSettings?: (participantId: string, settings: { maxRigs?: number; allowUpgrade?: boolean }) => Promise<void>;
+  // Phase 7: Mining pools
+  miningPools?: MiningPool[];
+  poolsEnabled?: boolean;
+  onTogglePools?: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
+  onDeletePool?: (poolId: string) => Promise<{ success: boolean; error?: string }>;
   // Phase 8
   onForceHalving?: () => Promise<{ success: boolean; previousReward?: number; newReward?: number; error?: string }>;
   onUpdateHalvingSettings?: (settings: { halvingInterval?: number; blockReward?: number }) => Promise<{ success: boolean; error?: string }>;
@@ -131,6 +137,11 @@ export default function TeacherDashboard({
   onForceDifficultyAdjustment,
   onUpdateDifficultySettings,
   onUpdateRigSettings,
+  // Phase 7: Mining pools
+  miningPools = [],
+  poolsEnabled = false,
+  onTogglePools,
+  onDeletePool,
   onForceHalving,
   onUpdateHalvingSettings,
   // Phase 9
@@ -1608,6 +1619,16 @@ export default function TeacherDashboard({
                         {index === 0 && blocksCount > 0 && (
                           <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
                         )}
+                        {student.poolId && (() => {
+                          const pool = miningPools.find(p => p.memberIds.includes(student.id));
+                          return pool ? (
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: pool.colorHex }}
+                              title={pool.name}
+                            />
+                          ) : null;
+                        })()}
                         <span className="text-sm font-medium text-body truncate">{student.name}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 text-xs">
@@ -1622,120 +1643,189 @@ export default function TeacherDashboard({
         </div>
       )}
 
-      {/* Phase 7 Difficulty: Period History + Stats (two side-by-side panels) */}
-      {currentPhase === 7 && difficultyInfo && (
+      {/* Phase 7: Pools + Period History (left) | Difficulty Adjustment (right) */}
+      {currentPhase === 7 && blocks.filter(b => b.status === 'mined').length > 0 && (
         <div className="grid md:grid-cols-2 gap-4">
-          {/* Left: Period History */}
-          <div className="zone-card">
-            <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-4 h-4 text-heading" />
-              <h2 className="text-sm font-semibold text-heading">{t('phase7.periodHistory')}</h2>
-            </div>
-            {difficultyInfo.periodHistory.length > 0 ? (
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {difficultyInfo.periodHistory.slice().reverse().map((period, idx) => (
-                  <div key={period.periodNumber} className={`p-2 rounded text-sm ${
-                    idx === 0 ? 'bg-amber-50 dark:bg-amber-900/10' : 'bg-surface-alt'
-                  }`}>
-                    <span className="font-medium">P{period.periodNumber}:</span>{' '}
-                    <span>{period.totalTimeSeconds}s</span>{' '}
-                    <span className="text-muted">({t('phase7.avgShort')}: {period.avgTimePerBlock}s)</span>
-                    {period.avgTimePerBlock > 0 && (
-                      <span className={
-                        period.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
-                          ? ' text-red-500'
-                          : period.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
-                            ? ' text-blue-500'
-                            : ' text-green-500'
-                      }>
-                        {' → '}{period.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
-                          ? t('phase7.tooFast')
-                          : period.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
-                            ? t('phase7.tooSlow')
-                            : t('phase7.onTarget')}
-                      </span>
-                    )}
-                  </div>
-                ))}
+          {/* Left column: Pools + Period History */}
+          <div className="flex flex-col gap-4">
+            {/* Mining Pools Controls */}
+            <div className="zone-card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users2 className="w-4 h-4 text-heading" />
+                  <h2 className="text-sm font-semibold text-heading">{t('pool.title')}</h2>
+                </div>
+                <button
+                  onClick={() => onTogglePools?.(!poolsEnabled)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    poolsEnabled
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  }`}
+                >
+                  {poolsEnabled ? t('pool.disablePools') : t('pool.enablePools')}
+                </button>
               </div>
-            ) : (
-              <p className="text-xs text-muted text-center py-4">{t('phase7.noPeriodYet')}</p>
+
+              {poolsEnabled && miningPools.length > 0 && (
+                <div className="space-y-2">
+                  {miningPools.map(pool => {
+                    const networkHashrate = students.reduce((sum, s) => sum + ((s.activeRigs ?? 0) * (s.rigSpeed || 4)), 0);
+                    const poolShare = networkHashrate > 0 ? Math.round((pool.totalHashrate / networkHashrate) * 100) : 0;
+                    return (
+                      <div key={pool.id} className="flex items-center gap-3 p-2 rounded-lg bg-surface-alt">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: pool.colorHex }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-heading truncate">{pool.name}</span>
+                            <span className="text-[10px] text-muted">{pool.memberIds.length} {t('pool.members').toLowerCase()}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted">
+                            <span>{pool.totalHashrate} h/s</span>
+                            <span>·</span>
+                            <span>{poolShare}% {t('pool.networkShare')}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onDeletePool?.(pool.id)}
+                          className="text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {poolsEnabled && miningPools.length === 0 && (
+                <p className="text-xs text-muted text-center py-3">{t('pool.noPool')}</p>
+              )}
+
+              {!poolsEnabled && (
+                <p className="text-xs text-muted text-center py-3">{t('pool.poolsDisabled')}</p>
+              )}
+            </div>
+
+            {/* Period History */}
+            {difficultyInfo && (
+              <div className="zone-card">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-4 h-4 text-heading" />
+                  <h2 className="text-sm font-semibold text-heading">{t('phase7.periodHistory')}</h2>
+                </div>
+                {difficultyInfo.periodHistory.length > 0 ? (
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {difficultyInfo.periodHistory.slice().reverse().map((period, idx) => (
+                      <div key={period.periodNumber} className={`p-2 rounded text-sm ${
+                        idx === 0 ? 'bg-amber-50 dark:bg-amber-900/10' : 'bg-surface-alt'
+                      }`}>
+                        <span className="font-medium">P{period.periodNumber}:</span>{' '}
+                        <span>{period.totalTimeSeconds}s</span>{' '}
+                        <span className="text-muted">({t('phase7.avgShort')}: {period.avgTimePerBlock}s)</span>
+                        {period.avgTimePerBlock > 0 && (
+                          <span className={
+                            period.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
+                              ? ' text-red-500'
+                              : period.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
+                                ? ' text-blue-500'
+                                : ' text-green-500'
+                          }>
+                            {' → '}{period.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
+                              ? t('phase7.tooFast')
+                              : period.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
+                                ? t('phase7.tooSlow')
+                                : t('phase7.onTarget')}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted text-center py-4">{t('phase7.noPeriodYet')}</p>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Right: Difficulty Stats 2x2 + Target Time Selector */}
-          <div className="zone-card">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-4 h-4 text-heading" />
-              <h2 className="text-sm font-semibold text-heading">{t('phase7.difficultyAdjustment')}</h2>
+          {/* Right column: Difficulty Adjustment */}
+          {difficultyInfo && (
+            <div className="zone-card">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-heading" />
+                <h2 className="text-sm font-semibold text-heading">{t('phase7.difficultyAdjustment')}</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="p-2 bg-surface-alt rounded-lg text-center">
+                  <p className="text-[10px] text-muted">{t('phase7.currentDifficulty')}</p>
+                  <p className="font-bold text-heading text-lg">
+                    {difficultyInfo.miningTarget
+                      ? difficultyInfo.miningTarget.toString(16).toUpperCase().padStart(4, '0')
+                      : difficultyInfo.currentDifficulty}
+                  </p>
+                  {difficultyInfo.miningTarget && difficultyInfo.avgTimePerBlock > 0 && (() => {
+                    const ratio = difficultyInfo.avgTimePerBlock / difficultyInfo.targetBlockTime;
+                    if (ratio >= 0.85 && ratio <= 1.15) return null;
+                    const clamped = Math.max(0.25, Math.min(4, ratio));
+                    const est = Math.max(1, Math.min(65535, Math.round(difficultyInfo.miningTarget! * clamped)));
+                    return (
+                      <p className={`text-[10px] mt-0.5 ${est < difficultyInfo.miningTarget! ? 'text-red-500' : 'text-blue-500'}`}>
+                        {t('phase7.estimatedNext')}: {est.toString(16).toUpperCase().padStart(4, '0')}
+                      </p>
+                    );
+                  })()}
+                </div>
+                <div className="p-2 bg-surface-alt rounded-lg text-center">
+                  <p className="text-[10px] text-muted">{t('phase7.targetBlockTime')}</p>
+                  <p className="font-bold text-heading text-lg">{difficultyInfo.targetBlockTime}s</p>
+                </div>
+                <div className="p-2 bg-surface-alt rounded-lg text-center">
+                  <p className="text-[10px] text-muted">{t('phase7.avgTimePerBlock')}</p>
+                  <p className={`font-bold text-lg ${
+                    difficultyInfo.avgTimePerBlock > 0
+                      ? difficultyInfo.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
+                        ? 'text-red-500'
+                        : difficultyInfo.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
+                          ? 'text-blue-500'
+                          : 'text-green-500'
+                      : 'text-heading'
+                  }`}>
+                    {difficultyInfo.avgTimePerBlock > 0 ? `${difficultyInfo.avgTimePerBlock}s` : '--'}
+                  </p>
+                </div>
+                <div className="p-2 bg-surface-alt rounded-lg text-center">
+                  <p className="text-[10px] text-muted">{t('phase7.blocksInPeriod')}</p>
+                  <p className="font-bold text-heading text-lg">
+                    {difficultyInfo.blocksInCurrentPeriod}/{difficultyInfo.adjustmentInterval}
+                  </p>
+                </div>
+              </div>
+              {/* Target Time Selector */}
+              <div className="flex items-center justify-between p-2 bg-surface-alt rounded-lg">
+                <p className="text-xs text-muted">{t('phase7.targetBlockTime')}</p>
+                <div className="flex gap-1.5">
+                  {[15, 30].map(sec => (
+                    <button
+                      key={sec}
+                      onClick={async () => {
+                        await onUpdateDifficultySettings?.({ targetBlockTime: sec });
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                        difficultyInfo.targetBlockTime === sec
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-surface text-muted hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                      }`}
+                    >
+                      {sec}s
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="p-2 bg-surface-alt rounded-lg text-center">
-                <p className="text-[10px] text-muted">{t('phase7.currentDifficulty')}</p>
-                <p className="font-bold text-heading text-lg">
-                  {difficultyInfo.miningTarget
-                    ? difficultyInfo.miningTarget.toString(16).toUpperCase().padStart(4, '0')
-                    : difficultyInfo.currentDifficulty}
-                </p>
-                {difficultyInfo.miningTarget && difficultyInfo.avgTimePerBlock > 0 && (() => {
-                  const ratio = difficultyInfo.avgTimePerBlock / difficultyInfo.targetBlockTime;
-                  if (ratio >= 0.85 && ratio <= 1.15) return null;
-                  const clamped = Math.max(0.25, Math.min(4, ratio));
-                  const est = Math.max(1, Math.min(65535, Math.round(difficultyInfo.miningTarget! * clamped)));
-                  return (
-                    <p className={`text-[10px] mt-0.5 ${est < difficultyInfo.miningTarget! ? 'text-red-500' : 'text-blue-500'}`}>
-                      {t('phase7.estimatedNext')}: {est.toString(16).toUpperCase().padStart(4, '0')}
-                    </p>
-                  );
-                })()}
-              </div>
-              <div className="p-2 bg-surface-alt rounded-lg text-center">
-                <p className="text-[10px] text-muted">{t('phase7.targetBlockTime')}</p>
-                <p className="font-bold text-heading text-lg">{difficultyInfo.targetBlockTime}s</p>
-              </div>
-              <div className="p-2 bg-surface-alt rounded-lg text-center">
-                <p className="text-[10px] text-muted">{t('phase7.avgTimePerBlock')}</p>
-                <p className={`font-bold text-lg ${
-                  difficultyInfo.avgTimePerBlock > 0
-                    ? difficultyInfo.avgTimePerBlock < difficultyInfo.targetBlockTime * 0.8
-                      ? 'text-red-500'
-                      : difficultyInfo.avgTimePerBlock > difficultyInfo.targetBlockTime * 1.2
-                        ? 'text-blue-500'
-                        : 'text-green-500'
-                    : 'text-heading'
-                }`}>
-                  {difficultyInfo.avgTimePerBlock > 0 ? `${difficultyInfo.avgTimePerBlock}s` : '--'}
-                </p>
-              </div>
-              <div className="p-2 bg-surface-alt rounded-lg text-center">
-                <p className="text-[10px] text-muted">{t('phase7.blocksInPeriod')}</p>
-                <p className="font-bold text-heading text-lg">
-                  {difficultyInfo.blocksInCurrentPeriod}/{difficultyInfo.adjustmentInterval}
-                </p>
-              </div>
-            </div>
-            {/* Target Time Selector */}
-            <div className="flex items-center justify-between p-2 bg-surface-alt rounded-lg">
-              <p className="text-xs text-muted">{t('phase7.targetBlockTime')}</p>
-              <div className="flex gap-1.5">
-                {[15, 30].map(sec => (
-                  <button
-                    key={sec}
-                    onClick={async () => {
-                      await onUpdateDifficultySettings?.({ targetBlockTime: sec });
-                    }}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      difficultyInfo.targetBlockTime === sec
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-surface text-muted hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                    }`}
-                  >
-                    {sec}s
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 

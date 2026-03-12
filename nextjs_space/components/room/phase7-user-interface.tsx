@@ -6,9 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pickaxe, Clock, Lock, Unlock, Zap, Activity,
   CheckCircle, XCircle, TrendingUp, TrendingDown, Minus,
-  Info, Settings, Link, ArrowUp,
+  Info, Settings, Link, ArrowUp, Users,
 } from 'lucide-react';
-import { Room, Participant, Block } from '@/lib/types';
+import { Room, Participant, Block, MiningPool } from '@/lib/types';
 import { DifficultyInfo } from '@/hooks/use-room-polling';
 import { RigState, BlockEvent } from '@/hooks/use-auto-mining';
 import { BlockchainVisualization } from './blockchain-visualization';
@@ -26,6 +26,12 @@ interface Phase7UserInterfaceProps {
   onToggleRig: (rigId: number) => void;
   onUpgradeRig: (newSpeed: number) => Promise<void>;
   onCreateGenesisBlock: () => Promise<void>;
+  // Mining pools
+  miningPools: MiningPool[];
+  poolsEnabled: boolean;
+  onCreatePool: (name: string) => Promise<{ success: boolean; error?: string }>;
+  onJoinPool: (poolId: string) => Promise<{ success: boolean; error?: string }>;
+  onLeavePool: (poolId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 function RigCard({
@@ -138,15 +144,32 @@ export function Phase7UserInterface({
   onToggleRig,
   onUpgradeRig,
   onCreateGenesisBlock,
+  miningPools,
+  poolsEnabled,
+  onCreatePool,
+  onJoinPool,
+  onLeavePool,
 }: Phase7UserInterfaceProps) {
   const { t } = useTranslation();
   const pendingBlock = blocks.find(b => b.status === 'pending');
   const minedBlocks = blocks.filter(b => b.status === 'mined').sort((a, b) => b.blockNumber - a.blockNumber);
   const hasGenesis = blocks.some(b => b.status === 'mined' && b.blockNumber === 1);
   const myBlocks = minedBlocks.filter(b => b.minerId === participant.id);
-  const myReward = myBlocks.reduce((sum, b) => sum + (b.reward || 0), 0);
+  // Use server-side totalMiningReward (includes pool share distribution)
+  const myReward = participant.totalMiningReward || 0;
   const maxRigs = participant.maxRigs || 1;
   const allowUpgrade = participant.allowUpgrade || false;
+
+  const [poolName, setPoolName] = useState('');
+  const [poolLoading, setPoolLoading] = useState(false);
+
+  const myPool = miningPools.find(p => p.memberIds.includes(participant.id));
+  const myPoolShare = myPool
+    ? (() => {
+        const myHashrate = (participant.activeRigs ?? 0) * (participant.rigSpeed || 4);
+        return myPool.totalHashrate > 0 ? Math.round((myHashrate / myPool.totalHashrate) * 1000) / 10 : 0;
+      })()
+    : 0;
 
   // Time since last block counter
   const [timeSinceLastBlock, setTimeSinceLastBlock] = useState(0);
@@ -344,6 +367,124 @@ export function Phase7UserInterface({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Mining Pool Section */}
+      {hasGenesis && poolsEnabled && (
+        <div className="zone-card">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-heading" />
+            <h2 className="text-sm font-semibold text-heading">{t('pool.title')}</h2>
+          </div>
+
+          {myPool ? (
+            /* In a pool — show pool info */
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: myPool.colorHex }}
+                />
+                <span className="font-semibold text-heading">{myPool.name}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-surface-alt rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted">{t('pool.members')}</p>
+                  <p className="font-bold text-heading">{myPool.memberIds.length}</p>
+                </div>
+                <div className="bg-surface-alt rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted">{t('pool.hashrate')}</p>
+                  <p className="font-bold text-heading">{myPool.totalHashrate} h/s</p>
+                </div>
+                <div className="bg-surface-alt rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-muted">{t('pool.yourShare')}</p>
+                  <p className="font-bold text-heading">{myPoolShare}%</p>
+                </div>
+              </div>
+              {/* Member list */}
+              <div className="space-y-1 mb-3">
+                {myPool.members?.map(m => (
+                  <div key={m.id} className="flex items-center justify-between text-xs px-2 py-1 rounded bg-surface-alt">
+                    <span className="text-body">{m.name} {m.id === participant.id && '(tu)'}</span>
+                    <span className="text-muted">{(m.activeRigs ?? 0) * (m.rigSpeed || 4)} h/s</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={async () => {
+                  setPoolLoading(true);
+                  await onLeavePool(myPool.id);
+                  setPoolLoading(false);
+                }}
+                disabled={poolLoading}
+                className="w-full py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 transition-colors"
+              >
+                {t('pool.leave')}
+              </button>
+            </div>
+          ) : (
+            /* Not in a pool — show options */
+            <div>
+              <p className="text-xs text-muted mb-3">{t('pool.noPool')}</p>
+
+              {/* Create a new pool */}
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={poolName}
+                  onChange={e => setPoolName(e.target.value)}
+                  placeholder={t('pool.namePlaceholder')}
+                  className="flex-1 px-2 py-1.5 rounded-lg text-xs bg-surface-alt border border-zinc-200 dark:border-zinc-700 text-body placeholder:text-muted"
+                  maxLength={20}
+                />
+                <button
+                  onClick={async () => {
+                    if (!poolName.trim()) return;
+                    setPoolLoading(true);
+                    await onCreatePool(poolName.trim());
+                    setPoolName('');
+                    setPoolLoading(false);
+                  }}
+                  disabled={poolLoading || !poolName.trim()}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 transition-colors disabled:opacity-50"
+                >
+                  {t('pool.create')}
+                </button>
+              </div>
+
+              {/* Available pools to join */}
+              {miningPools.length > 0 && (
+                <div className="space-y-1.5">
+                  {miningPools.map(pool => (
+                    <div key={pool.id} className="flex items-center gap-2 p-2 rounded-lg bg-surface-alt">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: pool.colorHex }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium text-heading truncate block">{pool.name}</span>
+                        <span className="text-[10px] text-muted">
+                          {pool.memberIds.length} {t('pool.members').toLowerCase()} · {pool.totalHashrate} h/s
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setPoolLoading(true);
+                          await onJoinPool(pool.id);
+                          setPoolLoading(false);
+                        }}
+                        disabled={poolLoading}
+                        className="px-2 py-1 rounded text-[10px] font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 transition-colors"
+                      >
+                        {t('pool.join')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

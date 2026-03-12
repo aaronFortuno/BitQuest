@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType } from '@/lib/types';
+import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType, MiningPool } from '@/lib/types';
 // TEMPORARILY DISABLED — Socket.io long-polling exhausts browser connection pool
 // import { joinRoom as socketJoinRoom, leaveRoom as socketLeaveRoom, onRoomUpdate } from '@/lib/socket';
 import { apiUrl } from '@/lib/api';
@@ -53,6 +53,9 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   const [difficultyInfo, setDifficultyInfo] = useState<DifficultyInfo | null>(null);
   const [halvingInfo, setHalvingInfo] = useState<HalvingInfo | null>(null);
   const [economicStats, setEconomicStats] = useState<EconomicStats | null>(null);
+  // Phase 7: Mining pools
+  const [miningPools, setMiningPools] = useState<MiningPool[]>([]);
+  const [poolsEnabled, setPoolsEnabled] = useState(false);
   // Phase 9: Free simulation
   const [simulationStats, setSimulationStats] = useState<SimulationStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -886,15 +889,33 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, []);
 
+  // Phase 7: Fetch mining pools
+  const fetchPools = useCallback(async () => {
+    const rid = roomUuidRef.current;
+    if (!rid) return;
+
+    try {
+      const res = await fetch(apiUrl(`/api/pools?roomId=${rid}`));
+      if (!res.ok) return;
+      const data = await res.json();
+      setMiningPools(data.pools || []);
+      setPoolsEnabled(data.poolsEnabled || false);
+    } catch (err) {
+      console.error('Fetch pools error:', err);
+    }
+  }, []);
+
   // Poll blocks when in Phase 6, 7, or 8
   useEffect(() => {
     if (!enabled || !room || (room.currentPhase !== 6 && room.currentPhase !== 7 && room.currentPhase !== 8)) return;
 
     fetchBlocks();
     fetchMempoolTransactions(); // Also fetch mempool for Phase 8 transaction selection
+    if (room.currentPhase === 7) fetchPools();
     const blocksPoll = setInterval(() => {
       fetchBlocks();
       fetchMempoolTransactions();
+      if (room.currentPhase === 7) fetchPools();
     }, 2000); // Uses base poll interval (Socket.io handles real-time)
 
     return () => clearInterval(blocksPoll);
@@ -1199,6 +1220,102 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       console.error('Upgrade rig error:', err);
     }
   }, [room, participantId, fetchRoom]);
+
+  // Phase 7: Pool actions
+  const createPool = useCallback(async (name: string): Promise<{ success: boolean; error?: string }> => {
+    if (!room || !participantId) return { success: false, error: 'No room' };
+    try {
+      const res = await fetch(apiUrl('/api/pools'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create-pool', roomId: room.id, name, creatorId: participantId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+      await fetchPools();
+      await fetchRoom();
+      return { success: true };
+    } catch (err) {
+      console.error('Create pool error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, participantId, fetchPools, fetchRoom]);
+
+  const joinPool = useCallback(async (poolId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!room || !participantId) return { success: false, error: 'No room' };
+    try {
+      const res = await fetch(apiUrl('/api/pools'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'join-pool', roomId: room.id, poolId, participantId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+      await fetchPools();
+      await fetchRoom();
+      return { success: true };
+    } catch (err) {
+      console.error('Join pool error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, participantId, fetchPools, fetchRoom]);
+
+  const leavePool = useCallback(async (poolId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!room || !participantId) return { success: false, error: 'No room' };
+    try {
+      const res = await fetch(apiUrl('/api/pools'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'leave-pool', roomId: room.id, poolId, participantId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+      await fetchPools();
+      await fetchRoom();
+      return { success: true };
+    } catch (err) {
+      console.error('Leave pool error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, participantId, fetchPools, fetchRoom]);
+
+  const deletePool = useCallback(async (poolId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!room) return { success: false, error: 'No room' };
+    try {
+      const res = await fetch(apiUrl('/api/pools'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete-pool', roomId: room.id, poolId }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+      await fetchPools();
+      await fetchRoom();
+      return { success: true };
+    } catch (err) {
+      console.error('Delete pool error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, fetchPools, fetchRoom]);
+
+  const togglePools = useCallback(async (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
+    if (!room) return { success: false, error: 'No room' };
+    try {
+      const res = await fetch(apiUrl('/api/pools'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle-pools', roomId: room.id, enabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+      await fetchPools();
+      await fetchRoom();
+      return { success: true };
+    } catch (err) {
+      console.error('Toggle pools error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, fetchPools, fetchRoom]);
 
   // Phase 8: Select transactions for block (miner selects which txs to include)
   const selectTransactionsForBlock = useCallback(async (txIds: string[]): Promise<{
@@ -1684,6 +1801,14 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     updateRigSettings,
     batchHashUpdate,
     upgradeRig,
+    // Phase 7: Mining pools
+    miningPools,
+    poolsEnabled,
+    createPool,
+    joinPool,
+    leavePool,
+    deletePool,
+    togglePools,
     // Phase 8
     selectTransactionsForBlock,
     forceHalving,

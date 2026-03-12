@@ -5,9 +5,45 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.7';
+const VERSION = 'v0.4.7.1';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.7.1',
+    date: '2026-03-12',
+    changes: {
+      ca: [
+        'Mining Pools: els alumnes poden crear i unir-se a pools de mineria',
+        'Recompensa repartida proporcionalment al hashrate aportat per cada membre del pool',
+        'El professor activa/desactiva pools i veu resum amb hashrate combinat i % xarxa',
+        'Badge de color al ranking de miners per identificar membres de cada pool',
+        'Layout professor reorganitzat: pools + historial (esquerra) | dificultat (dreta)',
+        'Fix: sincronització d\'activeRigs al servidor (hashrate del pool ja no mostra 0)',
+        'Fix: distribució equitativa quan el hashrate no s\'ha reportat encara',
+        'Fix: saldo al header usa totalMiningReward (inclou share del pool)',
+      ],
+      es: [
+        'Mining Pools: los alumnos pueden crear y unirse a pools de minería',
+        'Recompensa repartida proporcionalmente al hashrate aportado por cada miembro del pool',
+        'El profesor activa/desactiva pools y ve resumen con hashrate combinado y % red',
+        'Badge de color en el ranking de mineros para identificar miembros de cada pool',
+        'Layout profesor reorganizado: pools + historial (izquierda) | dificultad (derecha)',
+        'Fix: sincronización de activeRigs al servidor (hashrate del pool ya no muestra 0)',
+        'Fix: distribución equitativa cuando el hashrate no se ha reportado aún',
+        'Fix: saldo en el header usa totalMiningReward (incluye share del pool)',
+      ],
+      en: [
+        'Mining Pools: students can create and join mining pools',
+        'Reward split proportionally to hashrate contributed by each pool member',
+        'Teacher enables/disables pools and sees summary with combined hashrate and network %',
+        'Color badge on miner ranking to identify pool members',
+        'Teacher layout reorganized: pools + history (left) | difficulty (right)',
+        'Fix: activeRigs sync to server (pool hashrate no longer shows 0)',
+        'Fix: equal distribution when hashrate has not been reported yet',
+        'Fix: header balance uses totalMiningReward (includes pool share)',
+      ],
+    },
+  },
   {
     version: 'v0.4.7',
     date: '2026-03-12',

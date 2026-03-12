@@ -158,7 +158,9 @@ export async function GET(request: NextRequest) {
       transactionsRaw: block.transactions,
       transactions: JSON.parse(block.transactions || '[]'),
       selectedTxIds: block.selectedTxIds || [],
-      totalFees: block.totalFees || 0
+      totalFees: block.totalFees || 0,
+      poolId: block.poolId || null,
+      rewardDistribution: block.rewardDistribution ? JSON.parse(block.rewardDistribution) : null,
     }));
 
     // Calculate current period info
@@ -559,6 +561,63 @@ export async function POST(request: NextRequest) {
       const blockFees = pendingBlock.totalFees || 0;
       const totalMinerReward = pendingBlock.reward + blockFees;
 
+      // Pool reward distribution
+      let poolId: string | null = null;
+      let rewardDistribution: string | null = null;
+
+      if (miner.poolId) {
+        const pool = store.getMiningPool(miner.poolId);
+        if (pool) {
+          poolId = pool.id;
+          const members = pool.memberIds
+            .map(id => store.getParticipant(id))
+            .filter(Boolean);
+
+          // Calculate hashrate shares
+          const memberHashrates = members.map(m => ({
+            id: m!.id,
+            name: m!.name,
+            hashrate: (m!.activeRigs ?? 0) * (m!.rigSpeed || 4),
+          }));
+          const totalPoolHashrate = memberHashrates.reduce((sum, m) => sum + m.hashrate, 0);
+
+          // If totalPoolHashrate is 0 (e.g. rigs not yet reported), distribute equally
+          const useEqual = totalPoolHashrate === 0;
+          let distributed = 0;
+          const shares = memberHashrates.map(m => {
+            const sharePercent = useEqual
+              ? 1 / members.length
+              : m.hashrate / totalPoolHashrate;
+            const amount = Math.floor(totalMinerReward * sharePercent);
+            distributed += amount;
+            return {
+              participantId: m.id,
+              participantName: m.name,
+              hashrate: m.hashrate,
+              sharePercent: Math.round(sharePercent * 1000) / 10,
+              amount,
+            };
+          });
+
+          // Give remainder to the miner who found the block
+          const remainder = totalMinerReward - distributed;
+          const minerShare = shares.find(s => s.participantId === minerId);
+          if (minerShare) minerShare.amount += remainder;
+
+          rewardDistribution = JSON.stringify(shares);
+
+          // Update each pool member's totalMiningReward
+          for (const share of shares) {
+            const member = store.getParticipant(share.participantId);
+            if (member) {
+              store.updateParticipant(share.participantId, {
+                totalMiningReward: member.totalMiningReward + share.amount,
+              });
+            }
+          }
+        }
+      }
+
       // Mine the block
       store.updateBlock(pendingBlock.id, {
         status: 'mined',
@@ -566,13 +625,22 @@ export async function POST(request: NextRequest) {
         hash,
         minerId,
         minedAt: new Date(),
+        poolId,
+        rewardDistribution,
       });
 
-      // Update miner stats
-      store.updateParticipant(minerId, {
-        blocksMinedCount: miner.blocksMinedCount + 1,
-        totalMiningReward: miner.totalMiningReward + Math.floor(totalMinerReward),
-      });
+      // Update miner stats (blocksMinedCount only for the actual miner)
+      // If not in a pool, also add the full reward
+      if (!poolId) {
+        store.updateParticipant(minerId, {
+          blocksMinedCount: miner.blocksMinedCount + 1,
+          totalMiningReward: miner.totalMiningReward + Math.floor(totalMinerReward),
+        });
+      } else {
+        store.updateParticipant(minerId, {
+          blocksMinedCount: miner.blocksMinedCount + 1,
+        });
+      }
 
       const minedBlock = store.getBlock(pendingBlock.id)!;
       const updatedMiner = store.getParticipant(minerId)!;
@@ -729,6 +797,7 @@ export async function POST(request: NextRequest) {
     // Action: Reset blockchain for room
     if (action === 'reset') {
       store.deleteBlocksByRoom(roomId);
+      store.deleteAllMiningPools(roomId);
 
       // Reset all participant mining stats
       for (const p of state.participants.values()) {
@@ -883,24 +952,27 @@ export async function POST(request: NextRequest) {
     // Action: Batch hash update (auto-mining) - Phase 7
     if (action === 'batch-hash-update') {
       const { hashCount, activeRigs: rigCount } = body;
-      if (!minerId || !hashCount) {
+      if (!minerId || hashCount === undefined || hashCount === null) {
         return NextResponse.json({ error: 'minerId and hashCount required' }, { status: 400 });
       }
 
       const miner = store.getParticipant(minerId);
       if (miner) {
-        const pUpdates: Record<string, number> = {
-          hashAttempts: miner.hashAttempts + hashCount,
-        };
+        const pUpdates: Record<string, number> = {};
+        if (hashCount > 0) {
+          pUpdates.hashAttempts = miner.hashAttempts + hashCount;
+        }
         if (rigCount !== undefined) {
           pUpdates.activeRigs = rigCount;
         }
-        store.updateParticipant(minerId, pUpdates);
+        if (Object.keys(pUpdates).length > 0) {
+          store.updateParticipant(minerId, pUpdates);
+        }
       }
 
       const blocks = store.getBlocksByRoom(roomId);
       const pendingBlock = blocks.find(b => b.status === 'pending');
-      if (pendingBlock) {
+      if (pendingBlock && hashCount > 0) {
         store.updateBlock(pendingBlock.id, {
           hashAttempts: pendingBlock.hashAttempts + hashCount,
         });

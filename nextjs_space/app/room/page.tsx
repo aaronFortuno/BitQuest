@@ -119,6 +119,14 @@ export default function RoomPage() {
     updateRigSettings,
     batchHashUpdate,
     upgradeRig,
+    // Phase 7: Mining pools
+    miningPools,
+    poolsEnabled,
+    createPool,
+    joinPool,
+    leavePool,
+    deletePool,
+    togglePools,
     // Phase 8
     selectTransactionsForBlock,
     forceHalving,
@@ -336,6 +344,11 @@ export default function RoomPage() {
           onToggleRig={autoMining.toggleRig}
           onUpgradeRig={upgradeRig}
           onCreateGenesisBlock={createGenesisBlock}
+          miningPools={miningPools}
+          poolsEnabled={poolsEnabled}
+          onCreatePool={createPool}
+          onJoinPool={joinPool}
+          onLeavePool={leavePool}
         />
       );
     }
@@ -489,6 +502,10 @@ export default function RoomPage() {
             onForceDifficultyAdjustment={forceDifficultyAdjustment}
             onUpdateDifficultySettings={updateDifficultySettings}
             onUpdateRigSettings={updateRigSettings}
+            miningPools={miningPools}
+            poolsEnabled={poolsEnabled}
+            onTogglePools={togglePools}
+            onDeletePool={deletePool}
             onForceHalving={forceHalving}
             onUpdateHalvingSettings={updateHalvingSettings}
             // Phase 9

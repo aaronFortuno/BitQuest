@@ -220,16 +220,21 @@ export function useAutoMining({
     return () => clearInterval(intervalId);
   }, [enabled, pendingBlock?.id, pendingBlock?.transactionsRaw, pendingBlock?.blockNumber, pendingBlock?.previousHash, pendingBlock?.difficulty, pendingBlock?.miningTarget, currentPhase, rigs, onSubmitBlock]);
 
-  // Batch hash update (every 2 seconds)
+  // Batch hash update (every 2 seconds) — always sends rig state for pool hashrate sync
   useEffect(() => {
     if (!enabled) return;
 
+    // Send initial rig state immediately
+    const activeCount = rigs.filter(r => r.isActive && !r.isLocked).length;
+    onBatchHashUpdate(0, activeCount);
+
     const batchInterval = setInterval(() => {
       const count = miningRef.current.hashCountSinceLastBatch;
-      if (count > 0) {
-        miningRef.current.hashCountSinceLastBatch = 0;
-        const activeCount = rigs.filter(r => r.isActive && !r.isLocked).length;
-        onBatchHashUpdate(count, activeCount);
+      miningRef.current.hashCountSinceLastBatch = 0;
+      const currentActiveCount = rigs.filter(r => r.isActive && !r.isLocked).length;
+      // Always send to keep activeRigs synced (pool hashrate depends on it)
+      if (count > 0 || currentActiveCount > 0) {
+        onBatchHashUpdate(count, currentActiveCount);
       }
     }, 2000);
 
