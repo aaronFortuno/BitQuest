@@ -25,6 +25,9 @@ import {
   User,
   ShieldCheck,
   Wallet,
+  Link,
+  Trophy,
+  Pickaxe,
 } from 'lucide-react';
 import { Room, Transaction, Participant, CoinFile, SignedMessage, UTXO, UTXOTransaction, UTXOOutput, MempoolTransaction, NodeConnection, Block, HalvingInfo, EconomicStats, SimulationStats, ChallengeType, ChallengeData } from '@/lib/types';
 import { DifficultyInfo } from '@/hooks/use-room-polling';
@@ -33,6 +36,8 @@ import Phase3CryptoPanel from './phase3-crypto-panel';
 import Phase4UtxoPanel from './phase4-utxo-panel';
 import Phase3UserInterface from './phase3-user-interface';
 import Phase5TeacherPanel from './phase5-teacher-panel';
+import Phase6BlockchainPanel from './phase6-blockchain-panel';
+import { BlockchainVisualization } from './blockchain-visualization';
 
 interface TeacherDashboardProps {
   room: Room;
@@ -1330,76 +1335,80 @@ export default function TeacherDashboard({
         />
       )}
 
-      {/* Phase 6 Mining Control Panel */}
+      {/* Phase 6 Educational Panel */}
       {currentPhase === 6 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="zone-card phase-panel-orange"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-orange-600" />
-              <h2 className="font-semibold text-heading">{t('phase6InstructionTitle')}</h2>
+        <Phase6BlockchainPanel participantNames={students.map(s => s.name)} />
+      )}
+
+      {/* Phase 6: Blockchain Visualization with Genesis Button */}
+      {currentPhase === 6 && (
+        <div className="zone-card">
+          <div className="flex items-center gap-2 mb-3">
+            <Link className="w-4 h-4 text-heading" />
+            <h2 className="font-semibold text-heading">{t('phase6.blockchain')}</h2>
+          </div>
+          {blocks.filter(b => b.status === 'mined').length === 0 && !blocks.find(b => b.status === 'pending') ? (
+            <div className="text-center py-6">
+              <Pickaxe className="w-10 h-10 mx-auto text-muted mb-3" />
+              <p className="text-secondary mb-3">{t('phase6.noBlocksYet')}</p>
+              <button
+                onClick={() => onCreateGenesisBlock?.()}
+                disabled={blocks.length > 0}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2"
+              >
+                <Pickaxe className="w-4 h-4" />
+                {t('phase6.createGenesis')}
+              </button>
+            </div>
+          ) : (
+            <BlockchainVisualization
+              blocks={blocks}
+              pendingBlock={blocks.find(b => b.status === 'pending')}
+              currentParticipantId=""
+              difficulty={blocks.find(b => b.status === 'pending')?.difficulty || room.currentDifficulty || 2}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Phase 6: Network Stats + Miner Ranking (2 columns) */}
+      {currentPhase === 6 && blocks.filter(b => b.status === 'mined').length > 0 && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Left: Network Stats */}
+          <div className="zone-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="w-4 h-4 text-heading" />
+              <h2 className="text-sm font-semibold text-heading">{t('phase6.networkStats')}</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-surface-alt rounded-lg text-center">
+                <p className="text-xs text-muted">{t('phase6.currentBlock')}</p>
+                <p className="font-bold text-heading text-xl">
+                  #{blocks.find(b => b.status === 'pending')?.blockNumber || (blocks.filter(b => b.status === 'mined').sort((a, b) => b.blockNumber - a.blockNumber)[0]?.blockNumber || 0) + 1}
+                </p>
+              </div>
+              <div className="p-3 bg-surface-alt rounded-lg text-center">
+                <p className="text-xs text-muted">{t('phase6.totalHashAttempts')}</p>
+                <p className="font-bold text-heading text-xl">
+                  {students.reduce((sum, s) => sum + (s.hashAttempts || 0), 0)}
+                </p>
+              </div>
+              <div className="p-3 bg-surface-alt rounded-lg text-center">
+                <p className="text-xs text-muted">{t('phase6.activeMiners')}</p>
+                <p className="font-bold text-heading text-xl">
+                  {students.filter(s => (s.hashAttempts || 0) > 0).length}/{students.length}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Mining Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase6.currentBlock')}</p>
-              <p className="font-semibold text-orange-600 text-xl">
-                #{blocks.find(b => b.status === 'pending')?.blockNumber || (blocks.filter(b => b.status === 'mined').length > 0 ? blocks.filter(b => b.status === 'mined').sort((a, b) => b.blockNumber - a.blockNumber)[0].blockNumber + 1 : 1)}
-              </p>
+          {/* Right: Miner Ranking */}
+          <div className="zone-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Trophy className="w-4 h-4 text-yellow-500" />
+              <h2 className="text-sm font-semibold text-heading">{t('phase6.minerRanking')}</h2>
             </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase6.minedBlocks')}</p>
-              <p className="font-semibold text-green-600 text-xl">{blocks.filter(b => b.status === 'mined').length}</p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase6.totalHashAttempts')}</p>
-              <p className="font-semibold text-blue-600 text-xl">
-                {students.reduce((sum, s) => sum + (s.hashAttempts || 0), 0)}
-              </p>
-            </div>
-            <div className="p-3 bg-surface rounded-lg">
-              <p className="text-xs text-muted">{t('phase6.activeMiners')}</p>
-              <p className="font-semibold text-purple-600 text-xl">
-                {students.filter(s => (s.hashAttempts || 0) > 0).length}/{students.length}
-              </p>
-            </div>
-          </div>
-
-          {/* Demo controls */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button
-              onClick={() => onCreateGenesisBlock?.()}
-              disabled={blocks.length > 0}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
-            >
-              {t('phase6.createGenesis')}
-            </button>
-            <button
-              onClick={() => onCreatePendingBlock?.()}
-              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-lg transition-colors"
-            >
-              {t('phase6.createBlock')}
-            </button>
-            <button
-              onClick={() => onResetBlockchain?.()}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-colors"
-            >
-              {t('phase6.resetBlockchain')}
-            </button>
-          </div>
-
-          {/* Miner Rankings */}
-          <div className="mt-4">
-            <h3 className="font-medium text-body mb-3 flex items-center gap-2">
-              <Star className="w-4 h-4 text-yellow-500" />
-              {t('phase6.minerRanking')}
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
               {[...students]
                 .sort((a, b) => (b.blocksMinedCount || 0) - (a.blocksMinedCount || 0))
                 .map((student, index) => {
@@ -1407,28 +1416,30 @@ export default function TeacherDashboard({
                   const reward = student.totalMiningReward || 0;
                   const attempts = student.hashAttempts || 0;
                   return (
-                    <div 
-                      key={student.id} 
-                      className={`p-2 rounded-lg ${
-                        blocksCount > 0 
-                          ? 'bg-gradient-to-r from-yellow-100 to-orange-100 border border-yellow-300' 
-                          : 'bg-surface'
+                    <div
+                      key={student.id}
+                      className={`flex items-center justify-between p-2 rounded-lg ${
+                        blocksCount > 0
+                          ? 'bg-amber-50 dark:bg-amber-900/10'
+                          : 'bg-surface-alt'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-body truncate">{student.name}</p>
+                      <div className="flex items-center gap-2 min-w-0">
                         {index === 0 && blocksCount > 0 && (
-                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
                         )}
+                        <span className="text-sm font-medium text-body truncate">{student.name}</span>
                       </div>
-                      <p className="text-xs text-green-600 font-semibold">{reward} BTC</p>
-                      <p className="text-xs text-faint">{blocksCount} {t('phase6.blocksShort')} • {attempts} {t('phase6.attemptsShort')}</p>
+                      <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                        <span className="text-green-600 dark:text-green-400 font-semibold">{reward} BTC</span>
+                        <span className="text-muted">{blocksCount} {t('phase6.blocksShort')} · {attempts} h</span>
+                      </div>
                     </div>
                   );
                 })}
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Phase 7 Difficulty Adjustment Control Panel */}

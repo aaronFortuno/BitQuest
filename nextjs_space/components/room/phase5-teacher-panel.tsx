@@ -11,11 +11,6 @@ import {
   Unplug,
   Lock,
   Unlock,
-  Database,
-  ArrowRight,
-  Radio,
-  CheckCircle2,
-  Clock,
 } from 'lucide-react';
 import { Room, Participant, MempoolTransaction, NodeConnection } from '@/lib/types';
 import { TFunction } from 'i18next';
@@ -169,7 +164,6 @@ export default function Phase5TeacherPanel({
 }: Phase5TeacherPanelProps) {
   const [mode, setMode] = useState<TeacherMode>('tx');
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [mempoolViewers, setMempoolViewers] = useState<[string, string, string]>(['', '', '']);
 
   const sendingEnabled = room.studentSendingEnabled || false;
 
@@ -856,104 +850,6 @@ export default function Phase5TeacherPanel({
               </g>
             ))}
           </svg>
-        </div>
-      )}
-      {/* ─── Mempool comparison panels ─── */}
-      {students.length > 0 && activeConnections > 0 && (
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {([0, 1, 2] as const).map(idx => {
-            const selectedId = mempoolViewers[idx];
-            const selectedStudent = students.find(s => s.id === selectedId);
-
-            // Get TXs that have propagated to this node (same logic as student view)
-            const nodeTxs = selectedId
-              ? mempoolTransactions
-                  .filter(tx => tx.propagatedTo?.includes(selectedId) || tx.senderId === selectedId)
-                  .sort((a, b) => {
-                    // Sort by propagation order: earlier propagation first
-                    const aIdx = (a.propagatedTo || []).indexOf(selectedId);
-                    const bIdx = (b.propagatedTo || []).indexOf(selectedId);
-                    return bIdx - aIdx; // newest first (higher index = later wave)
-                  })
-              : [];
-
-            return (
-              <div key={idx} className="bg-gray-100 dark:bg-zinc-800/50 rounded-lg border border-gray-200 dark:border-zinc-700 p-2.5 flex flex-col">
-                {/* Selector */}
-                <div className="flex items-center gap-2 mb-2">
-                  <Database className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-                  <select
-                    value={selectedId}
-                    onChange={(e) => setMempoolViewers(prev => {
-                      const next = [...prev] as [string, string, string];
-                      next[idx] = e.target.value;
-                      return next;
-                    })}
-                    className="flex-1 bg-white dark:bg-zinc-700 border border-gray-300 dark:border-zinc-600 rounded px-2 py-1 text-sm text-body"
-                  >
-                    <option value="">-- {t('phase5.selectNode') || 'Selecciona node'} --</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} {s.isNodeDisconnected ? '(desc.)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedStudent && (
-                    <span className="text-xs text-muted whitespace-nowrap flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                      {nodeTxs.length} tx
-                    </span>
-                  )}
-                </div>
-
-                {/* TX list */}
-                <div className="flex-1 overflow-y-auto space-y-1 min-h-[120px] max-h-[250px]">
-                  {!selectedId ? (
-                    <div className="flex items-center justify-center h-full text-muted text-xs">
-                      {t('phase5.selectNodeToView') || 'Tria un node per veure la seva mempool'}
-                    </div>
-                  ) : nodeTxs.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-muted text-xs">
-                      {t('phase5.noTransactionsYet') || 'Cap transacció'}
-                    </div>
-                  ) : (
-                    <AnimatePresence initial={false}>
-                      {nodeTxs.map(tx => {
-                        const isPropagating = tx.status === 'propagating';
-                        const color = tx.propagationColor || '#facc15';
-                        return (
-                          <motion.div
-                            key={tx.id}
-                            initial={{ opacity: 0, x: -20, height: 0 }}
-                            animate={{ opacity: 1, x: 0, height: 'auto' }}
-                            exit={{ opacity: 0, x: 20, height: 0 }}
-                            transition={{ duration: 0.3, ease: 'easeOut' }}
-                            className="p-1.5 bg-white/50 dark:bg-zinc-700/40 rounded text-xs flex items-center gap-1.5"
-                          >
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: color }}
-                            />
-                            {isPropagating
-                              ? <Radio className="w-3 h-3 text-yellow-500 animate-pulse flex-shrink-0" />
-                              : <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
-                            }
-                            <span className="font-mono text-purple-500/80">{tx.txId}</span>
-                            <span className="text-body truncate">{tx.sender?.name || '?'}</span>
-                            <ArrowRight className="w-2.5 h-2.5 text-muted flex-shrink-0" />
-                            <span className="text-body truncate">{tx.receiver?.name || '?'}</span>
-                            <span className="ml-auto text-yellow-600 dark:text-yellow-400 font-medium whitespace-nowrap">
-                              {tx.amount} BTC
-                            </span>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  )}
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
     </motion.div>

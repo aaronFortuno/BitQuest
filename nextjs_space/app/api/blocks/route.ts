@@ -301,6 +301,25 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
+      // Auto-calculate initial difficulty based on connected students
+      // Each student clicks ~2 times/sec. Target: ~30s per block.
+      // Expected attempts = 16^d. Time = 16^d / (numStudents * 2).
+      // d=1: 16 attempts → too fast for any class
+      // d=2: 256 attempts → 6-25s for 5-20 students (ideal)
+      // d=3: 4096 attempts → only viable for 40+ students
+      const activeStudents = state.participants
+        ? Array.from(state.participants.values()).filter(p => p.isActive && p.role === 'student').length
+        : 0;
+      const clicksPerSecond = 2;
+      const targetSeconds = 30;
+      const optimalAttempts = targetSeconds * Math.max(activeStudents, 1) * clicksPerSecond;
+      const calculatedDifficulty = Math.max(1, Math.min(4,
+        Math.round(Math.log(optimalAttempts) / Math.log(16))
+      ));
+
+      // Update room difficulty to the calculated value
+      store.updateRoom(roomId, { currentDifficulty: calculatedDifficulty });
+
       const genesisHash = createHash('sha256')
         .update('1:0000000000000000:[]:0')
         .digest('hex');
@@ -309,7 +328,7 @@ export async function POST(request: NextRequest) {
         blockNumber: 1,
         previousHash: '0000000000000000',
         status: 'mined',
-        difficulty: room.currentDifficulty,
+        difficulty: calculatedDifficulty,
         reward: 0,
         transactions: '[]',
         selectedTxIds: [],

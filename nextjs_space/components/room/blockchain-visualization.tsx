@@ -38,28 +38,28 @@ function BlockCard({
   const { t } = useTranslation();
 
   const borderClass = isGenesis
-    ? 'border-amber-400 dark:border-amber-500 bg-amber-50/50 dark:bg-amber-900/20'
+    ? 'border-amber-300/50 dark:border-amber-500/30 bg-amber-50/30 dark:bg-amber-900/10'
     : isMine
-    ? 'border-green-400 dark:border-green-500 bg-green-50/50 dark:bg-green-900/20'
-    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50';
+    ? 'border-green-300/50 dark:border-green-500/30 bg-green-50/30 dark:bg-green-900/10'
+    : 'border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50';
 
   return (
     <div
-      className={`flex-shrink-0 w-[90px] rounded-lg border-2 p-2 ${borderClass}`}
+      className={`flex-shrink-0 w-[90px] rounded-lg border p-2 ${borderClass}`}
     >
       <div className="text-center">
         <div className="text-xs font-bold text-amber-600 dark:text-amber-400">
           #{block.blockNumber}
         </div>
         {isGenesis && (
-          <div className="text-[9px] font-medium text-amber-500">
+          <div className="text-[9px] font-medium text-amber-500 dark:text-amber-500/70">
             {t('phase6.genesis')}
           </div>
         )}
       </div>
 
       <div className="mt-1 space-y-0.5">
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 justify-center">
           <span className="text-[9px] text-muted-foreground">H:</span>
           {block.hash ? (
             <HashDisplay hash={block.hash} />
@@ -67,7 +67,7 @@ function BlockCard({
             <span className="text-[10px] text-muted-foreground">---</span>
           )}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 justify-center">
           <span className="text-[9px] text-muted-foreground">P:</span>
           <HashDisplay hash={block.previousHash} />
         </div>
@@ -75,7 +75,7 @@ function BlockCard({
 
       <div className="mt-1 text-center">
         {isGenesis ? (
-          <span className="text-[9px] text-amber-600">---</span>
+          <span className="text-[9px] text-muted-foreground">---</span>
         ) : block.miner ? (
           <div className="flex items-center justify-center gap-0.5">
             {isMine && <Trophy className="w-2.5 h-2.5 text-yellow-500" />}
@@ -114,7 +114,6 @@ export function BlockchainVisualization({
     .filter(b => b.status === 'mined')
     .sort((a, b) => a.blockNumber - b.blockNumber);
 
-  // Auto-scroll to the right
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
@@ -123,7 +122,7 @@ export function BlockchainVisualization({
 
   if (minedBlocks.length === 0 && !pendingBlock) {
     return (
-      <div className="text-center py-4 text-sm text-muted-foreground">
+      <div className="text-center py-4 text-sm text-secondary">
         {t('phase6.noBlocksYet')}
       </div>
     );
@@ -150,29 +149,35 @@ export function BlockchainVisualization({
         <div className="flex items-center">
           {minedBlocks.length > 0 && <ChainArrow />}
           <motion.div
-            animate={{ borderColor: ['rgb(251 146 60)', 'rgb(251 146 60 / 0.3)', 'rgb(251 146 60)'] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="flex-shrink-0 w-[90px] rounded-lg border-2 border-orange-400 p-2 bg-orange-50/50 dark:bg-orange-900/20"
+            animate={{
+              borderColor: [
+                'rgb(161 161 170 / 0.4)',
+                'rgb(251 191 36 / 0.5)',
+                'rgb(161 161 170 / 0.4)',
+              ],
+            }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+            className="flex-shrink-0 w-[90px] rounded-lg border p-2 bg-zinc-50/50 dark:bg-zinc-800/30"
           >
             <div className="text-center">
-              <div className="text-xs font-bold text-orange-600 dark:text-orange-400">
+              <div className="text-xs font-bold text-amber-600 dark:text-amber-400">
                 #{pendingBlock.blockNumber}
               </div>
               <div className="flex items-center justify-center gap-1 mt-0.5">
-                <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
-                <span className="text-[9px] text-orange-500">
+                <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                <span className="text-[9px] text-muted-foreground">
                   {t('phase6.mining')}...
                 </span>
               </div>
             </div>
             <div className="mt-1">
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5 justify-center">
                 <span className="text-[9px] text-muted-foreground">P:</span>
                 <HashDisplay hash={pendingBlock.previousHash} />
               </div>
             </div>
             <div className="mt-1 text-center">
-              <span className="text-[9px] text-orange-500">
+              <span className="text-[9px] text-muted-foreground">
                 {pendingBlock.transactions.length} tx
               </span>
             </div>

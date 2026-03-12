@@ -239,8 +239,12 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       await fetch(apiUrl(`/api/rooms/${room.id}/reset`), {
         method: 'POST',
       });
-      
+
       await fetchRoom();
+      // Phase 6+: blocks were cleared server-side, clear local state
+      if (room.currentPhase >= 6) {
+        setBlocks([]);
+      }
     } catch (err) {
       console.error('Reset error:', err);
     }

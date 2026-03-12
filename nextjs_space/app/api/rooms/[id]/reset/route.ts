@@ -24,6 +24,30 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
+    // Phase 6+: Reset blockchain data
+    if (state.room.currentPhase >= 6) {
+      store.deleteBlocksByRoom(id);
+
+      for (const p of state.participants.values()) {
+        p.blocksMinedCount = 0;
+        p.totalMiningReward = 0;
+        p.hashAttempts = 0;
+      }
+
+      store.updateRoom(id, {
+        currentBlockReward: 50,
+        totalBtcEmitted: 0,
+        currentDifficulty: 2,
+      });
+
+      // Revert confirmed mempool transactions
+      for (const tx of state.mempoolTransactions.values()) {
+        if (tx.status === 'confirmed') {
+          tx.status = 'in_mempool';
+        }
+      }
+    }
+
     const participants = Array.from(state.participants.values()).filter(p => p.isActive);
     const room = {
       ...state.room,
