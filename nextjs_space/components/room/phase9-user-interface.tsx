@@ -1,730 +1,611 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { 
-  Wallet, 
-  Send, 
-  Pickaxe, 
-  Eye, 
-  Inbox, 
-  Activity,
-  Star,
-  Zap,
-  ChevronDown,
-  Clock,
-  Check,
-  AlertTriangle,
-  TrendingUp,
-  Users,
-  Coins,
-  Hash
+import {
+  Send, Clock, ArrowRight, Info, Plus, Copy, Check,
+  CheckCircle, XCircle, ArrowDown, Wallet, Trash2,
 } from 'lucide-react';
-import { Room, Participant, Block, MempoolTransaction, SimulationStats, ChallengeData } from '@/lib/types';
-import crypto from 'crypto';
+import { Room, Participant, Block, BitcoinAddress, Phase9UTXO, Phase9MempoolTransaction } from '@/lib/types';
 
 interface Phase9UserInterfaceProps {
   room: Room;
   participant: Participant;
   blocks: Block[];
-  mempoolTransactions: MempoolTransaction[];
-  simulationStats: SimulationStats | null;
-  onUpdateRole: (role: 'user' | 'miner' | 'both') => Promise<{ success: boolean; error?: string }>;
-  onCreateTransaction: (receiverId: string, amount: number, fee: number) => Promise<{ success: boolean; error?: string }>;
-  onMineBlock: (nonce: number, hash: string, selectedTxIds: string[]) => Promise<{ success: boolean; block?: Block; reward?: number; feesEarned?: number; error?: string }>;
+  addresses: BitcoinAddress[];
+  utxos: Phase9UTXO[];
+  mempoolTxs: Phase9MempoolTransaction[];
+  autoMineSettings: { autoMineInterval: number; autoMineCapacity: number };
+  onGenerateAddress: () => Promise<{ success: boolean; address?: BitcoinAddress; error?: string }>;
+  onCreateTransaction: (
+    inputUtxoIds: string[],
+    outputs: { address: string; amount: number }[],
+    fee: number
+  ) => Promise<{ success: boolean; changeAddress?: string; changeAmount?: number; burnedOutputs?: string[]; error?: string }>;
+  onAutoMineTick: () => Promise<{ success: boolean; includedTxCount?: number; totalFees?: number; halvingEvent?: { previousReward: number; newReward: number }; error?: string }>;
 }
 
 export default function Phase9UserInterface({
   room,
   participant,
   blocks,
-  mempoolTransactions,
-  simulationStats,
-  onUpdateRole,
+  addresses,
+  utxos,
+  mempoolTxs,
+  autoMineSettings,
+  onGenerateAddress,
   onCreateTransaction,
-  onMineBlock,
+  onAutoMineTick,
 }: Phase9UserInterfaceProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'transaction' | 'mining' | 'blockchain' | 'mempool'>('transaction');
-  const [selectedRole, setSelectedRole] = useState<'user' | 'miner' | 'both'>(participant.simulationRole || 'both');
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-  
+
   // Transaction state
-  const [receiverId, setReceiverId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [fee, setFee] = useState('');
-  const [txFeedback, setTxFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  
-  // Mining state
-  const [isMining, setIsMining] = useState(false);
-  const [currentNonce, setCurrentNonce] = useState(0);
-  const [currentHash, setCurrentHash] = useState('');
-  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
-  const [miningFeedback, setMiningFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-  
-  // Activity log
-  const [activityLog, setActivityLog] = useState<{ id: string; message: string; timestamp: Date }[]>([]);
-  
-  const otherStudents = useMemo(() => 
-    room.participants.filter(p => p.id !== participant.id && p.role === 'student' && p.isActive),
-    [room.participants, participant.id]
+  const [selectedUtxoIds, setSelectedUtxoIds] = useState<string[]>([]);
+  const [outputs, setOutputs] = useState<{ address: string; amount: string }[]>([{ address: '', amount: '' }]);
+  const [txFee, setTxFee] = useState(0.5);
+  const [isCreatingTx, setIsCreatingTx] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info' | 'burned'; message: string } | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  // Auto-mine countdown
+  const [countdown, setCountdown] = useState(autoMineSettings.autoMineInterval);
+  const lastTickTimeRef = useRef<number>(Date.now());
+  const isMiningRef = useRef(false);
+  const onAutoMineTickRef = useRef(onAutoMineTick);
+  useEffect(() => { onAutoMineTickRef.current = onAutoMineTick; }, [onAutoMineTick]);
+
+  // Blockchain scroll ref
+  const blockchainScrollRef = useRef<HTMLDivElement>(null);
+
+  // Derived data
+  const myAddresses = useMemo(() =>
+    addresses.filter(a => a.ownerId === participant.id),
+    [addresses, participant.id]
   );
-  
+
+  const myUtxos = useMemo(() =>
+    utxos.filter(u => u.ownerId === participant.id && !u.isSpent),
+    [utxos, participant.id]
+  );
+
+  const myBalance = useMemo(() =>
+    myUtxos.reduce((sum, u) => sum + u.amount, 0),
+    [myUtxos]
+  );
+
   const pendingMempoolTxs = useMemo(() =>
-    mempoolTransactions.filter(tx => tx.status === 'in_mempool'),
-    [mempoolTransactions]
+    mempoolTxs
+      .filter(tx => tx.status === 'in_mempool')
+      .sort((a, b) => b.fee - a.fee),
+    [mempoolTxs]
   );
-  
-  const currentBlockReward = room.currentBlockReward || 50;
-  const currentDifficulty = room.currentDifficulty || 2;
-  const myBalance = participant.simulationBalance || 100;
-  const myBlocksMined = participant.blocksMinedCount || 0;
-  const lastBlock = blocks.length > 0 ? blocks[blocks.length - 1] : null;
-  
-  // Parse challenge data
-  const challengeData: ChallengeData | null = useMemo(() => {
-    if (room.challengeData) {
-      try {
-        return JSON.parse(room.challengeData);
-      } catch {
-        return null;
+
+  const capacity = autoMineSettings.autoMineCapacity;
+
+  const minedBlocks = useMemo(() =>
+    blocks.filter(b => b.status === 'mined').sort((a, b) => a.blockNumber - b.blockNumber),
+    [blocks]
+  );
+
+  const displayBlocks = minedBlocks.slice(-10);
+
+  // Selected UTXOs total
+  const selectedTotal = useMemo(() =>
+    myUtxos.filter(u => selectedUtxoIds.includes(u.id)).reduce((sum, u) => sum + u.amount, 0),
+    [myUtxos, selectedUtxoIds]
+  );
+
+  const outputsTotal = useMemo(() =>
+    outputs.reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0),
+    [outputs]
+  );
+
+  const changeAmount = useMemo(() =>
+    Math.round((selectedTotal - outputsTotal - txFee) * 10) / 10,
+    [selectedTotal, outputsTotal, txFee]
+  );
+
+  // Auto-scroll blockchain
+  useEffect(() => {
+    if (blockchainScrollRef.current) {
+      blockchainScrollRef.current.scrollLeft = blockchainScrollRef.current.scrollWidth;
+    }
+  }, [minedBlocks.length]);
+
+  // Feedback clear
+  useEffect(() => {
+    if (feedback) {
+      const timeout = setTimeout(() => setFeedback(null), feedback.type === 'burned' ? 6000 : 4000);
+      return () => clearTimeout(timeout);
+    }
+  }, [feedback]);
+
+  // Auto-mine timer
+  useEffect(() => {
+    lastTickTimeRef.current = Date.now();
+    setCountdown(autoMineSettings.autoMineInterval);
+
+    const tick = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - lastTickTimeRef.current) / 1000);
+      const remaining = Math.max(0, autoMineSettings.autoMineInterval - elapsed);
+      setCountdown(remaining);
+
+      if (remaining <= 0 && !isMiningRef.current) {
+        isMiningRef.current = true;
+        lastTickTimeRef.current = Date.now();
+        setCountdown(autoMineSettings.autoMineInterval);
+
+        onAutoMineTickRef.current().then(() => {
+          isMiningRef.current = false;
+        }).catch(() => {
+          isMiningRef.current = false;
+        });
       }
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [autoMineSettings.autoMineInterval, t]);
+
+  // Fee confidence
+  const getFeeConfidence = useCallback((fee: number) => {
+    if (pendingMempoolTxs.length === 0) {
+      return { label: t('phase8.highChance'), color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-900/30' };
     }
-    return null;
-  }, [room.challengeData]);
-  
-  const handleRoleChange = async (newRole: 'user' | 'miner' | 'both') => {
-    setSelectedRole(newRole);
-    setRoleDropdownOpen(false);
-    await onUpdateRole(newRole);
-  };
-  
-  const handleCreateTransaction = async () => {
-    if (!receiverId || !amount) {
-      setTxFeedback({ type: 'error', message: t('phase9.selectRecipientAndAmount') });
-      return;
+    const txsAhead = pendingMempoolTxs.filter(tx => tx.fee > fee).length;
+    if (txsAhead < capacity) {
+      return { label: t('phase8.highChance'), color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-900/30' };
     }
-    
-    const amountNum = parseFloat(amount);
-    const feeNum = parseFloat(fee) || 0;
-    
-    if (amountNum + feeNum > myBalance) {
-      setTxFeedback({ type: 'error', message: t('phase9.insufficientBalance') });
-      return;
+    if (txsAhead < capacity * 2) {
+      return { label: t('phase8.mediumChance'), color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30' };
     }
-    
-    const result = await onCreateTransaction(receiverId, amountNum, feeNum);
-    if (result.success) {
-      setTxFeedback({ type: 'success', message: t('phase9.transactionCreated') });
-      setReceiverId('');
-      setAmount('');
-      setFee('');
-      const receiverName = otherStudents.find(s => s.id === receiverId)?.name || 'Unknown';
-      addToActivityLog(`${t('phase9.sentTransaction')}: ${amountNum} BTC → ${receiverName}`);
-    } else {
-      setTxFeedback({ type: 'error', message: result.error || t('phase9.transactionFailed') });
-    }
-    
-    setTimeout(() => setTxFeedback(null), 3000);
-  };
-  
-  const calculateHash = (data: string): string => {
-    return crypto.createHash('sha256').update(data).digest('hex');
-  };
-  
-  const startMining = () => {
-    setIsMining(true);
-    setCurrentNonce(0);
-    setMiningFeedback({ type: 'info', message: t('phase9.miningStarted') });
-  };
-  
-  const performMiningStep = async () => {
-    if (!isMining) return;
-    
-    const previousHash = lastBlock?.hash || '0'.repeat(64);
-    const blockNumber = (lastBlock?.blockNumber || 0) + 1;
-    const dataToHash = `${blockNumber}|${previousHash}|${currentNonce}|${selectedTxIds.join(',')}`;
-    const hash = calculateHash(dataToHash);
-    
-    setCurrentHash(hash);
-    
-    const requiredPrefix = '0'.repeat(currentDifficulty);
-    if (hash.startsWith(requiredPrefix)) {
-      // Found valid hash!
-      setIsMining(false);
-      const result = await onMineBlock(currentNonce, hash, selectedTxIds);
-      if (result.success) {
-        const totalReward = (result.reward || currentBlockReward) + (result.feesEarned || 0);
-        setMiningFeedback({ type: 'success', message: `${t('phase9.blockMined')}! +${totalReward} BTC` });
-        addToActivityLog(`${t('phase9.minedBlock')} #${blockNumber} (+${totalReward} BTC)`);
-        setSelectedTxIds([]);
-      } else {
-        setMiningFeedback({ type: 'error', message: result.error || t('phase9.miningFailed') });
-      }
-    } else {
-      setCurrentNonce(prev => prev + 1);
-    }
-  };
-  
-  const stopMining = () => {
-    setIsMining(false);
-    setMiningFeedback({ type: 'info', message: t('phase9.miningStopped') });
-  };
-  
-  const toggleTxSelection = (txId: string) => {
-    setSelectedTxIds(prev => 
-      prev.includes(txId) 
-        ? prev.filter(id => id !== txId)
-        : [...prev, txId]
+    return { label: t('phase8.lowChance'), color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900/30' };
+  }, [pendingMempoolTxs, capacity, t]);
+
+  const feeConfidence = getFeeConfidence(txFee);
+
+  // Handlers
+  const toggleUtxo = (utxoId: string) => {
+    setSelectedUtxoIds(prev =>
+      prev.includes(utxoId) ? prev.filter(id => id !== utxoId) : [...prev, utxoId]
     );
   };
-  
-  const selectTopFees = () => {
-    const sorted = [...pendingMempoolTxs].sort((a, b) => b.fee - a.fee);
-    setSelectedTxIds(sorted.slice(0, 5).map(tx => tx.id));
+
+  const handleCopyAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedAddress(address);
+      setTimeout(() => setCopiedAddress(null), 2000);
+    } catch {
+      // Fallback: select text
+    }
   };
-  
-  const addToActivityLog = (message: string) => {
-    setActivityLog(prev => [{
-      id: Date.now().toString(),
-      message,
-      timestamp: new Date()
-    }, ...prev].slice(0, 10));
+
+  const handleAddOutput = () => {
+    setOutputs(prev => [...prev, { address: '', amount: '' }]);
   };
-  
-  // Mining loop
-  useEffect(() => {
-    if (!isMining) return;
-    
-    const interval = setInterval(performMiningStep, 100);
-    return () => clearInterval(interval);
-  }, [isMining, currentNonce]);
-  
-  const selectedFeesTotal = useMemo(() => 
-    pendingMempoolTxs
-      .filter(tx => selectedTxIds.includes(tx.id))
-      .reduce((sum, tx) => sum + tx.fee, 0),
-    [pendingMempoolTxs, selectedTxIds]
-  );
-  
-  const canMine = selectedRole === 'miner' || selectedRole === 'both';
-  const canTransact = selectedRole === 'user' || selectedRole === 'both';
-  
-  const roleLabels = {
-    user: t('phase9.roleUser'),
-    miner: t('phase9.roleMiner'),
-    both: t('phase9.roleBoth'),
+
+  const handleRemoveOutput = (index: number) => {
+    if (outputs.length <= 1) return;
+    setOutputs(prev => prev.filter((_, i) => i !== index));
   };
-  
+
+  const handleOutputChange = (index: number, field: 'address' | 'amount', value: string) => {
+    setOutputs(prev => prev.map((o, i) => i === index ? { ...o, [field]: value } : o));
+  };
+
+  const handleCreateTransaction = async () => {
+    if (selectedUtxoIds.length === 0) {
+      setFeedback({ type: 'error', message: t('phase9.selectInputs') });
+      return;
+    }
+
+    const validOutputs = outputs.filter(o => o.address && parseFloat(o.amount) > 0);
+    if (validOutputs.length === 0) {
+      setFeedback({ type: 'error', message: t('phase9.needOutput') });
+      return;
+    }
+
+    if (changeAmount < 0) {
+      setFeedback({ type: 'error', message: t('phase9.insufficientInputs') });
+      return;
+    }
+
+    setIsCreatingTx(true);
+
+    const result = await onCreateTransaction(
+      selectedUtxoIds,
+      validOutputs.map(o => ({ address: o.address, amount: Math.round(parseFloat(o.amount) * 10) / 10 })),
+      txFee
+    );
+
+    if (result.success) {
+      if (result.burnedOutputs && result.burnedOutputs.length > 0) {
+        setFeedback({ type: 'burned', message: `${t('phase9.txCreatedButBurned')}: ${result.burnedOutputs.join(', ')}` });
+      } else {
+        setFeedback({ type: 'success', message: t('phase9.txCreated') });
+      }
+      setSelectedUtxoIds([]);
+      setOutputs([{ address: '', amount: '' }]);
+      setTxFee(0.5);
+    } else {
+      setFeedback({ type: 'error', message: result.error || t('phase9.txFailed') });
+    }
+
+    setIsCreatingTx(false);
+  };
+
+  // Group UTXOs by address for display
+  const utxosByAddress = useMemo(() => {
+    const map = new Map<string, Phase9UTXO[]>();
+    for (const utxo of myUtxos) {
+      const list = map.get(utxo.address) || [];
+      list.push(utxo);
+      map.set(utxo.address, list);
+    }
+    return map;
+  }, [myUtxos]);
+
   return (
     <div className="space-y-4">
-      {/* Header Panel */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl p-4 border border-purple-500/30"
-      >
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="text-2xl">🌐</div>
-            <div>
-              <h2 className="text-xl font-bold text-white">{t('phase9.title')}</h2>
-              <p className="text-gray-400 text-sm">{t('phase9.subtitle')}</p>
-            </div>
-          </div>
-          
-          {/* Role Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 rounded-lg border border-gray-600 hover:border-purple-500 transition-colors"
-            >
-              <span className="text-gray-300">{t('phase9.myRole')}:</span>
-              <span className="font-semibold text-purple-400">{roleLabels[selectedRole]}</span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
-            </button>
-            
-            <AnimatePresence>
-              {roleDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute right-0 top-full mt-2 bg-gray-800 rounded-lg border border-gray-600 shadow-xl z-50 min-w-[150px]"
-                >
-                  {(['user', 'miner', 'both'] as const).map(role => (
-                    <button
-                      key={role}
-                      onClick={() => handleRoleChange(role)}
-                      className={`w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors ${
-                        selectedRole === role ? 'text-purple-400 bg-purple-900/30' : 'text-gray-300'
-                      } first:rounded-t-lg last:rounded-b-lg`}
-                    >
-                      {roleLabels[role]}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-        
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-yellow-400">
-              <Wallet className="w-4 h-4" />
-              <span className="text-sm">{t('phase9.myBalance')}</span>
-            </div>
-            <div className="text-xl font-bold text-white mt-1">{myBalance.toFixed(2)} BTC</div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-blue-400">
-              <Pickaxe className="w-4 h-4" />
-              <span className="text-sm">{t('phase9.blocksMined')}</span>
-            </div>
-            <div className="text-xl font-bold text-white mt-1">{myBlocksMined}</div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-green-400">
-              <Hash className="w-4 h-4" />
-              <span className="text-sm">{t('phase9.currentBlock')}</span>
-            </div>
-            <div className="text-xl font-bold text-white mt-1">#{(lastBlock?.blockNumber || 0) + 1}</div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-orange-400">
-              <Star className="w-4 h-4" />
-              <span className="text-sm">{t('phase9.difficulty')}</span>
-            </div>
-            <div className="text-xl font-bold text-white mt-1 flex items-center gap-1">
-              {Array.from({ length: currentDifficulty }).map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-orange-400 text-orange-400" />
-              ))}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-      
-      {/* Challenge Alert */}
-      {room.activeChallenge && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-gradient-to-r from-red-900/40 to-orange-900/40 rounded-xl p-4 border border-red-500/50"
-        >
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-red-400" />
-            <div>
-              <h3 className="font-bold text-red-300">
-                {t(`phase9.challenge.${room.activeChallenge}.title`)}
-              </h3>
-              <p className="text-sm text-red-200/80">
-                {t(`phase9.challenge.${room.activeChallenge}.description`)}
-              </p>
-            </div>
-          </div>
-          
-          {challengeData?.type === '51_attack' && challengeData.attackingGroup && (
-            <div className="mt-3 text-sm">
-              <span className="text-red-300">
-                {challengeData.attackingGroup.includes(participant.id) 
-                  ? `⚔️ ${t('phase9.youAreAttacker')}`
-                  : `🛡️ ${t('phase9.youAreDefender')}`
-                }
-              </span>
-            </div>
-          )}
-        </motion.div>
-      )}
-      
-      {/* Tab Navigation */}
-      <div className="flex gap-2 flex-wrap">
-        {canTransact && (
-          <button
-            onClick={() => setActiveTab('transaction')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              activeTab === 'transaction'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+      {/* Feedback */}
+      <AnimatePresence>
+        {feedback && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`p-3 rounded-lg flex items-center gap-3 text-sm ${
+              feedback.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+              feedback.type === 'burned' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
+              feedback.type === 'info' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+              'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
             }`}
           >
-            <Send className="w-4 h-4" />
-            {t('phase9.createTransaction')}
-          </button>
+            {feedback.type === 'success' && <CheckCircle className="w-4 h-4 flex-shrink-0" />}
+            {feedback.type === 'burned' && <XCircle className="w-4 h-4 flex-shrink-0" />}
+            {feedback.type === 'error' && <XCircle className="w-4 h-4 flex-shrink-0" />}
+            {feedback.type === 'info' && <Info className="w-4 h-4 flex-shrink-0" />}
+            <span>{feedback.message}</span>
+          </motion.div>
         )}
-        {canMine && (
-          <button
-            onClick={() => setActiveTab('mining')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              activeTab === 'mining'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            <Pickaxe className="w-4 h-4" />
-            {t('phase9.mineBlock')}
-          </button>
-        )}
-        <button
-          onClick={() => setActiveTab('blockchain')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'blockchain'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-          }`}
-        >
-          <Eye className="w-4 h-4" />
-          {t('phase9.viewBlockchain')}
-        </button>
-        <button
-          onClick={() => setActiveTab('mempool')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'mempool'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-          }`}
-        >
-          <Inbox className="w-4 h-4" />
-          {t('phase9.viewMempool')} ({pendingMempoolTxs.length})
-        </button>
+      </AnimatePresence>
+
+      {/* Next block countdown */}
+      <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-surface-alt">
+        <Clock className="w-4 h-4 text-muted" />
+        <span className="text-sm text-secondary">{t('phase8.nextBlockIn')}:</span>
+        <span className={`text-sm font-bold tabular-nums ${
+          countdown <= 5 ? 'text-red-500' : countdown <= 10 ? 'text-amber-500' : 'text-heading'
+        }`}>
+          {countdown}s
+        </span>
+        <span className="text-xs text-muted ml-2">
+          ({t('phase8.capacity')}: {capacity} tx)
+        </span>
       </div>
-      
-      {/* Tab Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Main Content Area */}
-        <div className="lg:col-span-2">
-          <AnimatePresence mode="wait">
-            {/* Transaction Tab */}
-            {activeTab === 'transaction' && canTransact && (
-              <motion.div
-                key="transaction"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700"
-              >
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Send className="w-5 h-5 text-purple-400" />
-                  {t('phase9.createTransaction')}
-                </h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">{t('phase9.recipient')}</label>
-                    <select
-                      value={receiverId}
-                      onChange={(e) => setReceiverId(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="">{t('phase9.selectRecipient')}</option>
-                      {otherStudents.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
+
+      {/* Blockchain viewer */}
+      <div className="zone-card">
+        <h3 className="text-sm font-semibold text-heading mb-2">{t('phase6.blockchain')}</h3>
+        <div ref={blockchainScrollRef} className="overflow-x-auto pb-2">
+          <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+            {displayBlocks.map(block => {
+              const txs: { sender: string; receiver: string; amount: number; fee?: number }[] =
+                typeof block.transactions === 'string' ? JSON.parse(block.transactions || '[]') : (block.transactions || []);
+              const isGenesis = block.blockNumber === 1 && txs.length === 0;
+
+              return (
+                <div
+                  key={block.id}
+                  className={`rounded-lg p-2 border min-w-[180px] max-w-[200px] ${
+                    isGenesis
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600'
+                      : 'bg-surface border-default'
+                  }`}
+                >
+                  <div className="mb-1">
+                    <span className="text-xs font-bold text-heading">#{block.blockNumber}</span>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">{t('phase9.amount')} (BTC)</label>
-                      <input
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        min="0.01"
-                        step="0.01"
-                        max={myBalance}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">{t('phase9.fee')} (BTC)</label>
-                      <input
-                        type="number"
-                        value={fee}
-                        onChange={(e) => setFee(e.target.value)}
-                        min="0"
-                        step="0.01"
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="text-sm text-gray-400">
-                    {t('phase9.totalCost')}: <span className="text-white font-semibold">
-                      {((parseFloat(amount) || 0) + (parseFloat(fee) || 0)).toFixed(2)} BTC
-                    </span>
-                  </div>
-                  
-                  <button
-                    onClick={handleCreateTransaction}
-                    disabled={!receiverId || !amount}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Send className="w-4 h-4" />
-                    {t('phase9.sendTransaction')}
-                  </button>
-                  
-                  {txFeedback && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`p-3 rounded-lg text-center ${
-                        txFeedback.type === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
-                      }`}
-                    >
-                      {txFeedback.message}
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-            
-            {/* Mining Tab */}
-            {activeTab === 'mining' && canMine && (
-              <motion.div
-                key="mining"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700"
-              >
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Pickaxe className="w-5 h-5 text-orange-400" />
-                  {t('phase9.miningZone')}
-                </h3>
-                
-                <div className="space-y-4">
-                  {/* Potential Reward */}
-                  <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 rounded-lg p-3 border border-yellow-500/30">
-                    <div className="text-sm text-yellow-400">{t('phase9.potentialReward')}</div>
-                    <div className="text-2xl font-bold text-yellow-300">
-                      {currentBlockReward} + {selectedFeesTotal} = {currentBlockReward + selectedFeesTotal} BTC
-                    </div>
-                    <div className="text-xs text-yellow-400/70 mt-1">
-                      {t('phase9.blockReward')} + {t('phase9.fees')}
-                    </div>
-                  </div>
-                  
-                  {/* Transaction Selection */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-400">{t('phase9.selectTransactions')}</span>
-                      <button
-                        onClick={selectTopFees}
-                        className="text-xs px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-                      >
-                        {t('phase9.selectTopFees')}
-                      </button>
-                    </div>
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                      {pendingMempoolTxs.length === 0 ? (
-                        <div className="text-center text-gray-500 py-2">{t('phase9.noTransactions')}</div>
-                      ) : (
-                        pendingMempoolTxs.slice(0, 10).map(tx => (
-                          <div
-                            key={tx.id}
-                            onClick={() => toggleTxSelection(tx.id)}
-                            className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
-                              selectedTxIds.includes(tx.id)
-                                ? 'bg-purple-900/50 border border-purple-500'
-                                : 'bg-gray-700/50 hover:bg-gray-600/50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                                selectedTxIds.includes(tx.id) ? 'bg-purple-500 border-purple-500' : 'border-gray-500'
-                              }`}>
-                                {selectedTxIds.includes(tx.id) && <Check className="w-3 h-3 text-white" />}
-                              </div>
-                              <span className="text-sm text-gray-300">{tx.txId}</span>
-                            </div>
-                            <span className="text-sm text-green-400">+{tx.fee} BTC</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Mining Status */}
-                  {isMining && (
-                    <div className="bg-gray-700/50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
-                        <span className="text-sm text-gray-300">{t('phase9.mining')}...</span>
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        <div>Nonce: <span className="text-white font-mono">{currentNonce}</span></div>
-                        <div className="truncate">Hash: <span className="text-white font-mono">{currentHash.substring(0, 32)}...</span></div>
-                        <div>{t('phase9.looking')}: <span className="text-orange-400">{'0'.repeat(currentDifficulty)}...</span></div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Mining Button */}
-                  <button
-                    onClick={isMining ? stopMining : startMining}
-                    className={`w-full py-3 font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${
-                      isMining
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-orange-600 hover:bg-orange-700 text-white'
-                    }`}
-                  >
-                    <Pickaxe className="w-5 h-5" />
-                    {isMining ? t('phase9.stopMining') : t('phase9.startMining')}
-                  </button>
-                  
-                  {miningFeedback && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`p-3 rounded-lg text-center ${
-                        miningFeedback.type === 'success' ? 'bg-green-900/50 text-green-300' :
-                        miningFeedback.type === 'error' ? 'bg-red-900/50 text-red-300' :
-                        'bg-blue-900/50 text-blue-300'
-                      }`}
-                    >
-                      {miningFeedback.message}
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-            
-            {/* Blockchain Tab */}
-            {activeTab === 'blockchain' && (
-              <motion.div
-                key="blockchain"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700"
-              >
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-blue-400" />
-                  {t('phase9.blockchain')}
-                </h3>
-                
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {blocks.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">{t('phase9.noBlocks')}</div>
+                  {isGenesis ? (
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400 italic">Genesis</div>
+                  ) : txs.length === 0 ? (
+                    <div className="text-[10px] text-muted italic">{t('phase8.emptyBlock')}</div>
                   ) : (
-                    [...blocks].reverse().map(block => (
-                      <div
-                        key={block.id}
-                        className="bg-gray-700/50 rounded-lg p-3 border border-gray-600"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-white">#{block.blockNumber}</span>
-                          <span className="text-sm text-gray-400">
-                            {block.miner?.name || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 truncate font-mono mb-1">
-                          {block.hash?.substring(0, 32)}...
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-yellow-400">+{block.reward} BTC</span>
-                          {block.totalFees > 0 && (
-                            <span className="text-green-400">+{block.totalFees} fees</span>
+                    <div className="space-y-0.5">
+                      {txs.map((tx, i) => (
+                        <div key={i} className="flex items-center gap-1 text-[10px]">
+                          <span className="text-secondary truncate max-w-[60px] font-mono">{tx.sender}</span>
+                          <ArrowRight className="w-2.5 h-2.5 text-muted flex-shrink-0" />
+                          <span className="text-secondary truncate max-w-[60px] font-mono">{tx.receiver}</span>
+                          {tx.fee !== undefined && (
+                            <span className="ml-auto text-green-600 dark:text-green-400 font-medium">{tx.fee}</span>
                           )}
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            )}
-            
-            {/* Mempool Tab */}
-            {activeTab === 'mempool' && (
-              <motion.div
-                key="mempool"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700"
-              >
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Inbox className="w-5 h-5 text-purple-400" />
-                  {t('phase9.mempool')} ({pendingMempoolTxs.length} {t('phase9.pending')})
-                </h3>
-                
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {pendingMempoolTxs.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">{t('phase9.mempoolEmpty')}</div>
-                  ) : (
-                    pendingMempoolTxs.map(tx => (
-                      <div
-                        key={tx.id}
-                        className="bg-gray-700/50 rounded-lg p-3 border border-gray-600"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-mono text-sm text-white">{tx.txId}</span>
-                          <span className="text-sm text-green-400">Fee: {tx.fee} BTC</span>
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {tx.sender?.name} → {tx.receiver?.name}: {tx.amount} BTC
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-        
-        {/* Activity Log Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 h-full">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-green-400" />
-              {t('phase9.recentActivity')}
-            </h3>
-            
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {activityLog.length === 0 ? (
-                <div className="text-center text-gray-500 py-4 text-sm">{t('phase9.noActivity')}</div>
-              ) : (
-                activityLog.map(entry => (
-                  <motion.div
-                    key={entry.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="bg-gray-700/50 rounded-lg p-2 text-sm"
-                  >
-                    <div className="text-gray-300">{entry.message}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {entry.timestamp.toLocaleTimeString()}
+                      ))}
                     </div>
-                  </motion.div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Main content: 2 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left column: Addresses/UTXOs + Transaction builder */}
+        <div className="space-y-4">
+
+          {/* My Addresses & UTXOs */}
+          <div className="zone-card">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-heading flex items-center gap-2">
+                <Wallet className="w-4 h-4" />
+                {t('phase9.myAddresses')}
+              </h3>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-heading">{myBalance.toFixed(1)} BTC</span>
+                <button
+                  onClick={onGenerateAddress}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  {t('phase9.generateAddress')}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-[250px] overflow-y-auto">
+              {myAddresses.length === 0 ? (
+                <div className="text-center text-muted text-sm py-4">{t('phase9.noAddresses')}</div>
+              ) : (
+                Array.from(utxosByAddress.entries()).map(([address, addrUtxos]) => (
+                  <div key={address} className="bg-surface-alt rounded-lg p-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs text-secondary">{address}</span>
+                      <button
+                        onClick={() => handleCopyAddress(address)}
+                        className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                        title={t('phase9.copyAddress')}
+                      >
+                        {copiedAddress === address
+                          ? <Check className="w-3 h-3 text-green-500" />
+                          : <Copy className="w-3 h-3 text-muted" />
+                        }
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {addrUtxos.map(utxo => (
+                        <label
+                          key={utxo.id}
+                          className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition-colors ${
+                            selectedUtxoIds.includes(utxo.id)
+                              ? 'bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-600'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedUtxoIds.includes(utxo.id)}
+                            onChange={() => toggleUtxo(utxo.id)}
+                            className="accent-amber-500"
+                          />
+                          <span className="text-xs text-muted">{utxo.utxoId}</span>
+                          <span className="text-xs font-semibold text-heading ml-auto">{utxo.amount.toFixed(1)} BTC</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 ))
               )}
+              {/* Addresses without unspent UTXOs (show as empty) */}
+              {myAddresses
+                .filter(a => !utxosByAddress.has(a.address))
+                .map(a => (
+                  <div key={a.id} className="bg-surface-alt rounded-lg p-2 opacity-50">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted">{a.address}</span>
+                      <button
+                        onClick={() => handleCopyAddress(a.address)}
+                        className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                      >
+                        {copiedAddress === a.address
+                          ? <Check className="w-3 h-3 text-green-500" />
+                          : <Copy className="w-3 h-3 text-muted" />
+                        }
+                      </button>
+                      <span className="text-[10px] text-muted ml-auto italic">{t('phase9.empty')}</span>
+                    </div>
+                  </div>
+                ))
+              }
             </div>
-            
-            {/* Quick Stats */}
-            {simulationStats && (
-              <div className="mt-4 pt-4 border-t border-gray-700">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2">{t('phase9.networkStats')}</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-gray-700/30 rounded p-2">
-                    <div className="text-gray-500">{t('phase9.totalBlocks')}</div>
-                    <div className="text-white font-semibold">{simulationStats.totalBlocks}</div>
-                  </div>
-                  <div className="bg-gray-700/30 rounded p-2">
-                    <div className="text-gray-500">{t('phase9.btcCirculation')}</div>
-                    <div className="text-white font-semibold">{simulationStats.btcInCirculation.toFixed(1)}</div>
-                  </div>
+          </div>
+
+          {/* Transaction Builder */}
+          <div className="zone-card">
+            <h3 className="text-sm font-semibold text-heading mb-3 flex items-center gap-2">
+              <Send className="w-4 h-4" />
+              {t('phase9.buildTransaction')}
+            </h3>
+
+            {/* Inputs hint */}
+            <div className={`mb-3 p-2 rounded-lg border text-xs font-medium ${
+              selectedUtxoIds.length > 0
+                ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300'
+                : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-muted'
+            }`}>
+              <ArrowDown className="w-3 h-3 inline mr-1" />
+              {selectedUtxoIds.length > 0
+                ? <>{t('phase9.selectedInputs')}: {selectedUtxoIds.length} UTXO{selectedUtxoIds.length > 1 ? 's' : ''} = <span className="font-bold">{selectedTotal.toFixed(1)} BTC</span></>
+                : t('phase9.inputsLabel')
+              }
+            </div>
+
+
+            {/* Outputs */}
+            <div className="space-y-2 mb-3">
+              <div className="text-xs text-muted font-medium">{t('phase9.outputs')}:</div>
+              {outputs.map((output, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={output.address}
+                    onChange={(e) => handleOutputChange(index, 'address', e.target.value)}
+                    placeholder={t('phase9.pasteAddress')}
+                    className="flex-1 px-2 py-1.5 text-xs font-mono bg-surface border border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 text-body"
+                  />
+                  <input
+                    type="number"
+                    value={output.amount}
+                    onChange={(e) => handleOutputChange(index, 'amount', e.target.value)}
+                    placeholder="BTC"
+                    min="0.1"
+                    step="0.1"
+                    className="w-20 px-2 py-1.5 text-xs bg-surface border border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 text-body"
+                  />
+                  {outputs.length > 1 && (
+                    <button
+                      onClick={() => handleRemoveOutput(index)}
+                      className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
+              ))}
+              <button
+                onClick={handleAddOutput}
+                className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:underline"
+              >
+                <Plus className="w-3 h-3" />
+                {t('phase9.addOutput')}
+              </button>
+            </div>
+
+            {/* Fee slider */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted">{t('phase8.fee')}:</span>
+                <span className="text-xs font-semibold text-heading">{txFee.toFixed(1)} BTC</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="5"
+                step="0.1"
+                value={txFee}
+                onChange={(e) => setTxFee(parseFloat(e.target.value))}
+                className="w-full accent-amber-500"
+              />
+              <div className={`text-xs mt-1 px-2 py-1 rounded ${feeConfidence.bgColor} ${feeConfidence.color}`}>
+                {feeConfidence.label}
+              </div>
+            </div>
+
+            {/* Transaction summary */}
+            {selectedUtxoIds.length > 0 && outputsTotal > 0 && (
+              <div className="mb-3 p-2 bg-surface-alt rounded-lg text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted">{t('phase9.totalInputs')}:</span>
+                  <span className="text-heading font-semibold">{selectedTotal.toFixed(1)} BTC</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">{t('phase9.totalOutputs')}:</span>
+                  <span className="text-heading">{outputsTotal.toFixed(1)} BTC</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">{t('phase8.fee')}:</span>
+                  <span className="text-amber-600 dark:text-amber-400">{txFee.toFixed(1)} BTC</span>
+                </div>
+                {changeAmount > 0 && (
+                  <div className="flex justify-between border-t border-default pt-1">
+                    <span className="text-muted">{t('phase9.autoChange')}:</span>
+                    <span className="text-green-600 dark:text-green-400">{changeAmount.toFixed(1)} BTC</span>
+                  </div>
+                )}
+                {changeAmount < 0 && (
+                  <div className="text-red-600 dark:text-red-400 font-medium">
+                    {t('phase9.insufficientInputs')}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Send button */}
+            <button
+              onClick={handleCreateTransaction}
+              disabled={isCreatingTx || selectedUtxoIds.length === 0 || outputsTotal <= 0 || changeAmount < 0}
+              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <Send className="w-4 h-4" />
+              {isCreatingTx ? t('phase9.sending') : t('phase9.sendTransaction')}
+            </button>
+          </div>
+        </div>
+
+        {/* Right column: Mempool */}
+        <div>
+          <div className="zone-card h-full">
+            <h3 className="text-sm font-semibold text-heading mb-2">
+              Mempool ({pendingMempoolTxs.length})
+            </h3>
+
+            <div className="space-y-1 max-h-[500px] overflow-y-auto">
+              {pendingMempoolTxs.length === 0 ? (
+                <div className="text-center text-muted text-sm py-8">{t('phase8.mempoolEmpty')}</div>
+              ) : (
+                pendingMempoolTxs.map((tx, index) => {
+                  const isMyTx = tx.senderParticipantId === participant.id;
+                  const willEnterNextBlock = index < capacity;
+                  const showCutLine = index === capacity;
+
+                  return (
+                    <div key={tx.id}>
+                      {showCutLine && (
+                        <div className="flex items-center gap-2 py-1.5 my-1">
+                          <div className="flex-1 border-t-2 border-dashed border-red-400" />
+                          <span className="text-[10px] text-red-500 font-medium whitespace-nowrap">
+                            <ArrowDown className="w-3 h-3 inline mr-0.5" />
+                            {t('phase8.wontEnter')}
+                          </span>
+                          <div className="flex-1 border-t-2 border-dashed border-red-400" />
+                        </div>
+                      )}
+                      <div className={`p-2 rounded-lg text-xs ${
+                        isMyTx
+                          ? willEnterNextBlock
+                            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'
+                            : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700'
+                          : willEnterNextBlock
+                            ? 'bg-green-50/50 dark:bg-green-900/10'
+                            : 'bg-surface-alt'
+                      }`}>
+                        <div className="flex items-center gap-1">
+                          {isMyTx && (
+                            <span className="text-[10px] px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium">
+                              {t('phase8.myTx')}
+                            </span>
+                          )}
+                          {willEnterNextBlock && <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />}
+                          <span className="font-mono text-muted truncate max-w-[70px]">
+                            {tx.inputs[0]?.address || '???'}
+                          </span>
+                          <ArrowRight className="w-3 h-3 text-muted flex-shrink-0" />
+                          <span className="font-mono text-muted truncate max-w-[70px]">
+                            {tx.outputs.find(o => !o.isChange)?.address || '???'}
+                          </span>
+                          <span className="ml-auto font-bold text-green-600 dark:text-green-400">
+                            {tx.fee.toFixed(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </div>

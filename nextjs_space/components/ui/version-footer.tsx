@@ -5,9 +5,60 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, GitCommit } from 'lucide-react';
 
-const VERSION = 'v0.4.8';
+const VERSION = 'v0.4.9';
 
 const CHANGELOG = [
+  {
+    version: 'v0.4.9',
+    date: '2026-03-14',
+    changes: {
+      ca: [
+        'Fase 9: adreces i pseudonimitat — els alumnes envien BTC a adreces bc1q... en lloc de noms, descobrint la privacitat de Bitcoin',
+        'Model UTXO amb adreces: cada alumne comença amb 50 BTC en una adreça generada automàticament',
+        'Múltiples outputs per transacció: es pot enviar a diverses adreces alhora',
+        'Canvi automàtic: el sistema genera una nova adreça de retorn per al canvi',
+        'BTC cremats: si l\'adreça de destí no existeix, els BTC es perden per sempre (sense validació)',
+        'Professor com a node: el professor té les mateixes eines (adreces, UTXOs, crear transaccions) per exemplificar a classe',
+        'Botó "Enviar saldo a tots els nodes": el professor pot finançar manualment tots els participants amb 50 BTC',
+        'Visor blockchain simplificat: eliminada la recompensa de bloc (innecessària en aquest context)',
+        'Indicador d\'inputs al formulari: guia visual per seleccionar UTXOs abans de crear transaccions',
+        'Eliminat panell halving obsolet de la fase 9',
+        'Eliminada barra "Subsidit reduït" de la fase 8',
+        'Layout alumne 50/50 com a fase 8',
+        'Dashboard professor fase 9 reorganitzat: activitat alumnes moguda sota mempool per equilibrar columnes',
+      ],
+      es: [
+        'Fase 9: direcciones y pseudonimato — los alumnos envían BTC a direcciones bc1q... en lugar de nombres, descubriendo la privacidad de Bitcoin',
+        'Modelo UTXO con direcciones: cada alumno empieza con 50 BTC en una dirección generada automáticamente',
+        'Múltiples outputs por transacción: se puede enviar a varias direcciones a la vez',
+        'Cambio automático: el sistema genera una nueva dirección de retorno para el cambio',
+        'BTC quemados: si la dirección de destino no existe, los BTC se pierden para siempre (sin validación)',
+        'Profesor como nodo: el profesor tiene las mismas herramientas (direcciones, UTXOs, crear transacciones) para ejemplificar en clase',
+        'Botón "Enviar saldo a todos los nodos": el profesor puede financiar manualmente a todos los participantes con 50 BTC',
+        'Visor blockchain simplificado: eliminada la recompensa de bloque (innecesaria en este contexto)',
+        'Indicador de inputs en el formulario: guía visual para seleccionar UTXOs antes de crear transacciones',
+        'Eliminado panel halving obsoleto de la fase 9',
+        'Eliminada barra "Subsidio reducido" de la fase 8',
+        'Layout alumno 50/50 como en fase 8',
+        'Dashboard profesor fase 9 reorganizado: actividad alumnos movida bajo mempool para equilibrar columnas',
+      ],
+      en: [
+        'Phase 9: addresses & pseudonymity — students send BTC to bc1q... addresses instead of names, discovering Bitcoin privacy',
+        'UTXO model with addresses: each student starts with 50 BTC in an auto-generated address',
+        'Multiple outputs per transaction: send to several addresses at once',
+        'Automatic change: the system generates a new return address for change',
+        'Burned BTC: if the destination address doesn\'t exist, BTC is lost forever (no validation)',
+        'Teacher as node: teacher has the same tools (addresses, UTXOs, create transactions) to demonstrate in class',
+        '"Fund all nodes" button: teacher can manually give all participants 50 BTC',
+        'Simplified blockchain viewer: removed block reward (unnecessary in this context)',
+        'Input indicator in the form: visual guide to select UTXOs before creating transactions',
+        'Removed obsolete halving panel from phase 9',
+        'Removed "Reduced subsidy" bar from phase 8',
+        'Student layout 50/50 like phase 8',
+        'Teacher dashboard phase 9 reorganized: student activity moved under mempool to balance columns',
+      ],
+    },
+  },
   {
     version: 'v0.4.8',
     date: '2026-03-12',

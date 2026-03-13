@@ -257,10 +257,55 @@ export interface DifficultyPeriod {
   adjustmentResult?: 'increased' | 'decreased' | 'stable';
 }
 
-// Phase 9: Challenge types
-export type ChallengeType = '51_attack' | 'congestion' | 'fork' | 'economy' | 'environment' | null;
+// Phase 9: Bitcoin Address (pseudonymity)
+export interface BitcoinAddress {
+  id: string;
+  address: string;      // "bc1q" + 6 random alphanumeric lowercase
+  roomId: string;
+  ownerId: string;      // participant ID
+  createdAt: string;
+}
 
-// Phase 9: Simulation statistics
+// Phase 9: Address-based UTXO
+export interface Phase9UTXO {
+  id: string;
+  utxoId: string;       // e.g. "UTXO#1"
+  roomId: string;
+  address: string;      // the bc1q... address that owns this
+  ownerId: string;      // participant ID (for lookup convenience, empty if burned)
+  amount: number;
+  isSpent: boolean;
+  spentInTxId: string | null;
+  createdInTxId: string | null;
+  createdAt: string;
+}
+
+// Phase 9: Transaction output (address-based)
+export interface Phase9TxOutput {
+  address: string;      // destination bc1q... address
+  amount: number;
+  isChange: boolean;    // auto-generated change output
+  newUtxoId: string;    // UTXO ID created by this output
+}
+
+// Phase 9: Address-based mempool transaction
+export interface Phase9MempoolTransaction {
+  id: string;
+  txId: string;         // e.g. "TX#1"
+  roomId: string;
+  senderParticipantId: string;  // who created it (for highlighting own TXs)
+  inputUtxoIds: string[];       // UTXO IDs consumed
+  inputs: { address: string; amount: number }[];  // for display
+  outputs: Phase9TxOutput[];
+  totalInput: number;
+  totalOutput: number;
+  fee: number;          // totalInput - totalOutput
+  status: 'in_mempool' | 'confirmed';
+  createdAt: string;
+}
+
+// Phase 9 (legacy — will be removed when UI is rewritten)
+export type ChallengeType = '51_attack' | 'congestion' | 'fork' | 'economy' | 'environment' | null;
 export interface SimulationStats {
   totalBlocks: number;
   totalTransactions: number;
@@ -271,8 +316,6 @@ export interface SimulationStats {
   difficultyHistory: { blockNumber: number; difficulty: number }[];
   transactionVolume: { timestamp: string; count: number }[];
 }
-
-// Phase 9: Challenge data
 export interface ChallengeData {
   type: ChallengeType;
   startedAt?: string;
@@ -283,15 +326,6 @@ export interface ChallengeData {
   forkBlockNumber?: number;
   forkDetected?: boolean;
   congestionLevel?: number;
-}
-
-// Phase 9: Activity log entry
-export interface ActivityLogEntry {
-  id: string;
-  timestamp: string;
-  type: 'transaction_sent' | 'transaction_received' | 'block_mined' | 'challenge_event' | 'system';
-  message: string;
-  participantId?: string;
 }
 
 // Phase 7: Mining Pools

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType, MiningPool } from '@/lib/types';
+import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType, MiningPool, BitcoinAddress, Phase9UTXO, Phase9MempoolTransaction } from '@/lib/types';
 // TEMPORARILY DISABLED — Socket.io long-polling exhausts browser connection pool
 // import { joinRoom as socketJoinRoom, leaveRoom as socketLeaveRoom, onRoomUpdate } from '@/lib/socket';
 import { apiUrl } from '@/lib/api';
@@ -58,8 +58,12 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   const [poolsEnabled, setPoolsEnabled] = useState(false);
   // Phase 8: Auto-mine settings
   const [autoMineSettings, setAutoMineSettings] = useState<{ autoMineInterval: number; autoMineCapacity: number }>({ autoMineInterval: 20, autoMineCapacity: 3 });
-  // Phase 9: Free simulation
+  // Phase 9: Free simulation (legacy)
   const [simulationStats, setSimulationStats] = useState<SimulationStats | null>(null);
+  // Phase 9: Address-based pseudonymity
+  const [phase9Addresses, setPhase9Addresses] = useState<BitcoinAddress[]>([]);
+  const [phase9Utxos, setPhase9Utxos] = useState<Phase9UTXO[]>([]);
+  const [phase9MempoolTxs, setPhase9MempoolTxs] = useState<Phase9MempoolTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const lastTransactionCount = useRef(0);
@@ -250,6 +254,16 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       // Phase 6+: blocks were cleared server-side, clear local state
       if (room.currentPhase >= 6) {
         setBlocks([]);
+      }
+
+      // Phase 9: re-initialize addresses and UTXOs after reset
+      if (room.currentPhase === 9) {
+        await fetch(apiUrl('/api/simulation'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId: room.id, action: 'init-phase9' }),
+        });
+        await fetchRoom();
       }
     } catch (err) {
       console.error('Reset error:', err);
@@ -1493,187 +1507,137 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     }
   }, [room, fetchBlocks]);
 
-  // Phase 9: Fetch simulation statistics
-  const fetchSimulationStats = useCallback(async () => {
+  // Phase 9: Fetch addresses, UTXOs, mempool txs
+  const fetchPhase9Data = useCallback(async () => {
     const rid = roomUuidRef.current;
     if (!rid) return;
 
     try {
       const res = await fetch(apiUrl(`/api/simulation?roomId=${rid}`));
-      if (!res.ok) throw new Error('Failed to fetch simulation stats');
+      if (!res.ok) throw new Error('Failed to fetch Phase 9 data');
       const data = await res.json();
-      setSimulationStats(data);
+      setPhase9Addresses(data.addresses || []);
+      setPhase9Utxos(data.utxos || []);
+      setPhase9MempoolTxs(data.mempoolTxs || []);
     } catch (err) {
-      console.error('Fetch simulation stats error:', err);
+      console.error('Fetch Phase 9 data error:', err);
     }
   }, []);
 
-  // Phase 9: Poll simulation stats
+  // Phase 9: Poll data
   useEffect(() => {
     if (!enabled || !room || room.currentPhase !== 9) return;
 
-    fetchSimulationStats();
+    fetchPhase9Data();
     fetchBlocks();
-    fetchMempoolTransactions();
-    
+
     const simPoll = setInterval(() => {
-      fetchSimulationStats();
+      fetchPhase9Data();
       fetchBlocks();
-      fetchMempoolTransactions();
-    }, 5000);
+    }, 2500);
 
     return () => clearInterval(simPoll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.currentPhase, room?.id, enabled]);
 
-  // Phase 9: Start simulation
-  const startSimulation = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+  // Phase 9: Initialize (teacher)
+  const initPhase9 = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!room) return { success: false, error: 'No room' };
 
     try {
       const res = await fetch(apiUrl('/api/simulation'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'start-simulation',
-        }),
+        body: JSON.stringify({ roomId: room.id, action: 'init-phase9' }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
+      if (!res.ok) return { success: false, error: data.error };
 
       await fetchRoom();
-      await fetchSimulationStats();
+      await fetchPhase9Data();
+      await fetchBlocks();
       return { success: true };
     } catch (err) {
-      console.error('Start simulation error:', err);
+      console.error('Init Phase 9 error:', err);
       return { success: false, error: 'Network error' };
     }
-  }, [room, fetchRoom, fetchSimulationStats]);
+  }, [room, fetchRoom, fetchPhase9Data, fetchBlocks]);
 
-  // Phase 9: Reset simulation
-  const resetSimulation = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+  // Phase 9: Reset (teacher)
+  const resetPhase9 = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!room) return { success: false, error: 'No room' };
 
     try {
       const res = await fetch(apiUrl('/api/simulation'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'reset-simulation',
-        }),
+        body: JSON.stringify({ roomId: room.id, action: 'reset-phase9' }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
+      if (!res.ok) return { success: false, error: data.error };
 
       await fetchRoom();
-      await fetchSimulationStats();
+      await fetchPhase9Data();
+      setBlocks([]);
       return { success: true };
     } catch (err) {
-      console.error('Reset simulation error:', err);
+      console.error('Reset Phase 9 error:', err);
       return { success: false, error: 'Network error' };
     }
-  }, [room, fetchRoom, fetchSimulationStats]);
+  }, [room, fetchRoom, fetchPhase9Data]);
 
-  // Phase 9: Update participant role
-  const updateSimulationRole = useCallback(async (newRole: 'user' | 'miner' | 'both'): Promise<{ success: boolean; error?: string }> => {
+  // Phase 9: Fund all nodes (teacher) — gives 50 BTC to nodes without UTXOs
+  const fundAllPhase9Nodes = useCallback(async (): Promise<{ success: boolean; funded?: number; error?: string }> => {
+    if (!room) return { success: false, error: 'No room' };
+
+    try {
+      const res = await fetch(apiUrl('/api/simulation'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: room.id, action: 'fund-all-nodes' }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+
+      await fetchPhase9Data();
+      return { success: true, funded: data.funded };
+    } catch (err) {
+      console.error('Fund all nodes error:', err);
+      return { success: false, error: 'Network error' };
+    }
+  }, [room, fetchPhase9Data]);
+
+  // Phase 9: Generate new Bitcoin address (student)
+  const generateAddress = useCallback(async (): Promise<{ success: boolean; address?: BitcoinAddress; error?: string }> => {
     if (!room || !participantId) return { success: false, error: 'No room or participant' };
 
     try {
       const res = await fetch(apiUrl('/api/simulation'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'update-role',
-          participantId,
-          newRole,
-        }),
+        body: JSON.stringify({ roomId: room.id, action: 'generate-address', participantId }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
+      if (!res.ok) return { success: false, error: data.error };
 
-      await fetchRoom();
-      return { success: true };
+      await fetchPhase9Data();
+      return { success: true, address: data.address };
     } catch (err) {
-      console.error('Update role error:', err);
+      console.error('Generate address error:', err);
       return { success: false, error: 'Network error' };
     }
-  }, [room, participantId, fetchRoom]);
+  }, [room, participantId, fetchPhase9Data]);
 
-  // Phase 9: Launch a challenge
-  const launchChallenge = useCallback(async (challengeType: ChallengeType): Promise<{ success: boolean; challengeData?: ChallengeData; error?: string }> => {
-    if (!room) return { success: false, error: 'No room' };
-
-    try {
-      const res = await fetch(apiUrl('/api/simulation'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'launch-challenge',
-          challengeType,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
-
-      await fetchRoom();
-      await fetchSimulationStats();
-      return { success: true, challengeData: data.challengeData };
-    } catch (err) {
-      console.error('Launch challenge error:', err);
-      return { success: false, error: 'Network error' };
-    }
-  }, [room, fetchRoom, fetchSimulationStats]);
-
-  // Phase 9: End current challenge
-  const endChallenge = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    if (!room) return { success: false, error: 'No room' };
-
-    try {
-      const res = await fetch(apiUrl('/api/simulation'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'end-challenge',
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
-
-      await fetchRoom();
-      await fetchSimulationStats();
-      return { success: true };
-    } catch (err) {
-      console.error('End challenge error:', err);
-      return { success: false, error: 'Network error' };
-    }
-  }, [room, fetchRoom, fetchSimulationStats]);
-
-  // Phase 9: Create simulation transaction
-  const createSimulationTransaction = useCallback(async (
-    receiverId: string,
-    amount: number,
-    fee: number = 0
-  ): Promise<{ success: boolean; error?: string }> => {
+  // Phase 9: Create UTXO-based transaction with addresses
+  const createPhase9Transaction = useCallback(async (
+    inputUtxoIds: string[],
+    outputs: { address: string; amount: number }[],
+    fee: number
+  ): Promise<{ success: boolean; changeAddress?: string; changeAmount?: number; burnedOutputs?: string[]; error?: string }> => {
     if (!room || !participantId) return { success: false, error: 'No room or participant' };
 
     try {
@@ -1683,123 +1647,85 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
         body: JSON.stringify({
           roomId: room.id,
           action: 'create-transaction',
-          senderId: participantId,
-          receiverId,
-          amount,
+          participantId,
+          inputUtxoIds,
+          outputs,
           fee,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
+      if (!res.ok) return { success: false, error: data.error };
 
-      await fetchRoom();
-      await fetchSimulationStats();
-      await fetchMempoolTransactions();
-      return { success: true };
-    } catch (err) {
-      console.error('Create simulation transaction error:', err);
-      return { success: false, error: 'Network error' };
-    }
-  }, [room, participantId, fetchRoom, fetchSimulationStats, fetchMempoolTransactions]);
-
-  // Phase 9: Mine block in simulation
-  const mineSimulationBlock = useCallback(async (
-    nonce: number,
-    hash: string,
-    selectedTxIds: string[] = []
-  ): Promise<{ success: boolean; block?: Block; reward?: number; feesEarned?: number; error?: string }> => {
-    if (!room || !participantId) return { success: false, error: 'No room or participant' };
-
-    try {
-      const res = await fetch(apiUrl('/api/simulation'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'mine-block',
-          minerId: participantId,
-          nonce,
-          hash,
-          selectedTxIds,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
-
-      await fetchRoom();
-      await fetchBlocks();
-      await fetchSimulationStats();
-      await fetchMempoolTransactions();
-      return { 
-        success: true, 
-        block: data.block, 
-        reward: data.reward,
-        feesEarned: data.feesEarned 
+      await fetchPhase9Data();
+      return {
+        success: true,
+        changeAddress: data.changeAddress,
+        changeAmount: data.changeAmount,
+        burnedOutputs: data.burnedOutputs,
       };
     } catch (err) {
-      console.error('Mine simulation block error:', err);
+      console.error('Create Phase 9 transaction error:', err);
       return { success: false, error: 'Network error' };
     }
-  }, [room, participantId, fetchRoom, fetchBlocks, fetchSimulationStats, fetchMempoolTransactions]);
+  }, [room, participantId, fetchPhase9Data]);
 
-  // Phase 9: Fill mempool for congestion demo
-  const fillSimulationMempool = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+  // Phase 9: Auto-mine tick (called by client timer)
+  const autoMineTickPhase9 = useCallback(async (): Promise<{
+    success: boolean;
+    includedTxCount?: number;
+    totalFees?: number;
+    halvingEvent?: { previousReward: number; newReward: number };
+    error?: string;
+  }> => {
     if (!room) return { success: false, error: 'No room' };
 
     try {
       const res = await fetch(apiUrl('/api/simulation'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'fill-mempool',
-        }),
+        body: JSON.stringify({ roomId: room.id, action: 'auto-mine-tick' }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
+      if (!res.ok) return { success: false, error: data.error };
+      if (data.skipped) return { success: false };
 
-      await fetchMempoolTransactions();
-      await fetchSimulationStats();
-      return { success: true };
+      await fetchPhase9Data();
+      await fetchBlocks();
+      return {
+        success: true,
+        includedTxCount: data.includedTxCount,
+        totalFees: data.totalFees,
+        halvingEvent: data.halvingEvent,
+      };
     } catch (err) {
-      console.error('Fill mempool error:', err);
+      console.error('Auto-mine tick Phase 9 error:', err);
       return { success: false, error: 'Network error' };
     }
-  }, [room, fetchMempoolTransactions, fetchSimulationStats]);
+  }, [room, fetchPhase9Data, fetchBlocks]);
 
-  // Phase 9: Accelerate halvings for economy challenge
-  const accelerateHalvings = useCallback(async (count: number = 3): Promise<{ success: boolean; newReward?: number; error?: string }> => {
+  // Phase 9: Update auto-mine settings (teacher)
+  const updatePhase9Settings = useCallback(async (settings: {
+    autoMineInterval?: number;
+    autoMineCapacity?: number;
+  }): Promise<{ success: boolean; error?: string }> => {
     if (!room) return { success: false, error: 'No room' };
 
     try {
       const res = await fetch(apiUrl('/api/simulation'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: room.id,
-          action: 'accelerate-halvings',
-          halvingCount: count,
-        }),
+        body: JSON.stringify({ roomId: room.id, action: 'update-settings', ...settings }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error };
-      }
+      if (!res.ok) return { success: false, error: data.error };
 
       await fetchRoom();
-      return { success: true, newReward: data.newReward };
+      return { success: true };
     } catch (err) {
-      console.error('Accelerate halvings error:', err);
+      console.error('Update Phase 9 settings error:', err);
       return { success: false, error: 'Network error' };
     }
   }, [room, fetchRoom]);
@@ -1831,8 +1757,12 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     difficultyInfo,
     halvingInfo,
     economicStats,
-    // Phase 9
+    // Phase 9 (legacy — for old UI until rewritten)
     simulationStats,
+    // Phase 9: Addresses & Pseudonymity
+    phase9Addresses,
+    phase9Utxos,
+    phase9MempoolTxs,
     loading,
     error,
     sendTransaction,
@@ -1891,16 +1821,14 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     autoMineTick,
     updatePhase8Settings,
     autoMineSettings,
-    // Phase 9
-    startSimulation,
-    resetSimulation,
-    updateSimulationRole,
-    launchChallenge,
-    endChallenge,
-    createSimulationTransaction,
-    mineSimulationBlock,
-    fillSimulationMempool,
-    accelerateHalvings,
+    // Phase 9: Addresses & Pseudonymity
+    initPhase9,
+    resetPhase9,
+    fundAllPhase9Nodes,
+    generateAddress,
+    createPhase9Transaction,
+    autoMineTickPhase9,
+    updatePhase9Settings,
     updateParticipantCoinFile,
     refetch: fetchRoom,
   };

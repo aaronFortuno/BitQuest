@@ -198,15 +198,6 @@ export function Phase8UserInterface({
         </span>
       </div>
 
-      {/* Halving info bar (anecdotic, when subsidy < 50) */}
-      {halvingInfo && halvingInfo.currentBlockReward < 50 && (
-        <div className="flex items-center gap-3 py-2 px-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 text-sm">
-          <Flame className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-          <span className="text-yellow-700 dark:text-yellow-300">
-            {t('phase8.subsidyReduced')}: <span className="font-bold">{halvingInfo.currentBlockReward} BTC</span> + fees
-          </span>
-        </div>
-      )}
 
       {/* Block history with transaction details — grows right, auto-scrolls */}
       {displayBlocks.length > 0 && (

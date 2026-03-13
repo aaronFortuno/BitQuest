@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { store } from '@/lib/store';
 import { broadcastRoomUpdate } from '@/lib/io';
 
 
-// GET: Fetch simulation stats for Phase 9
+// GET: Fetch Phase 9 state (addresses, UTXOs, mempool txs)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -18,76 +19,50 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    const room = state.room;
-    const participants = Array.from(state.participants.values())
-      .filter(p => p.isActive)
-      .sort((a, b) => b.simulationBalance - a.simulationBalance);
-
-    // Get block statistics
-    const blocks = store.getBlocksByRoom(roomId)
-      .filter(b => b.status === 'mined')
-      .sort((a, b) => a.blockNumber - b.blockNumber);
-
-    // Get mempool transaction count
-    const mempoolTxCount = store.countMempoolTransactions(roomId);
-
-    // Calculate total energy spent
-    const totalEnergySpent = participants.reduce(
-      (sum, p) => sum + (p.totalEnergySpent || 0), 0
-    );
-
-    const totalHashAttempts = participants.reduce(
-      (sum, p) => sum + (p.hashAttempts || 0), 0
-    );
-
-    // Build wealth distribution
-    const wealthDistribution = participants
-      .filter(p => p.role === 'student')
-      .map(p => ({
-        participantId: p.id,
-        name: p.name,
-        balance: p.simulationBalance || 0
-      }))
-      .sort((a, b) => b.balance - a.balance);
-
-    // Build difficulty history from blocks
-    const difficultyHistory = blocks.map(b => ({
-      blockNumber: b.blockNumber,
-      difficulty: b.difficulty
+    const addresses = store.getPhase9AddressesByRoom(roomId).map(a => ({
+      id: a.id,
+      address: a.address,
+      roomId: a.roomId,
+      ownerId: a.ownerId,
+      createdAt: a.createdAt.toISOString(),
     }));
 
-    // Parse challenge data if exists
-    let challengeData = null;
-    if (room.challengeData) {
-      try {
-        challengeData = JSON.parse(room.challengeData);
-      } catch {
-        challengeData = null;
-      }
-    }
+    const utxos = store.getPhase9UTXOsByRoom(roomId).map(u => ({
+      id: u.id,
+      utxoId: u.utxoId,
+      roomId: u.roomId,
+      address: u.address,
+      ownerId: u.ownerId,
+      amount: u.amount,
+      isSpent: u.isSpent,
+      spentInTxId: u.spentInTxId,
+      createdInTxId: u.createdInTxId,
+      createdAt: u.createdAt.toISOString(),
+    }));
 
-    const stats = {
-      totalBlocks: blocks.length,
-      totalTransactions: mempoolTxCount,
-      btcInCirculation: room.totalBtcEmitted || 0,
-      totalHashrate: totalHashAttempts,
-      totalEnergySpent,
-      wealthDistribution,
-      difficultyHistory,
-      transactionVolume: [],
-      activeChallenge: room.activeChallenge,
-      challengeData,
-      simulationStarted: room.simulationStarted
-    };
+    const mempoolTxs = store.getPhase9MempoolTxsByRoom(roomId).map(tx => ({
+      id: tx.id,
+      txId: tx.txId,
+      roomId: tx.roomId,
+      senderParticipantId: tx.senderParticipantId,
+      inputUtxoIds: tx.inputUtxoIds,
+      inputs: tx.inputs,
+      outputs: tx.outputs,
+      totalInput: tx.totalInput,
+      totalOutput: tx.totalOutput,
+      fee: tx.fee,
+      status: tx.status,
+      createdAt: tx.createdAt.toISOString(),
+    }));
 
-    return NextResponse.json(stats);
+    return NextResponse.json({ addresses, utxos, mempoolTxs });
   } catch (error) {
-    console.error('Error fetching simulation stats:', error);
-    return NextResponse.json({ error: 'Failed to fetch simulation stats' }, { status: 500 });
+    console.error('Error fetching Phase 9 data:', error);
+    return NextResponse.json({ error: 'Failed to fetch Phase 9 data' }, { status: 500 });
   }
 }
 
-// POST: Manage simulation actions
+// POST: Phase 9 actions
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -107,293 +82,411 @@ export async function POST(request: NextRequest) {
     const roomCode = store.getRoomCodeById(roomId);
 
     switch (action) {
-      case 'start-simulation': {
+
+      // ---- Initialize Phase 9 ----
+      // Creates 1 address + 1 UTXO of 50 BTC for each student
+      case 'init-phase9': {
+        // Clear any previous data
+        store.deletePhase9DataByRoom(roomId);
+        store.deleteBlocksByRoom(roomId);
+
+        // All participants (students + teacher) get an initial address + 50 BTC UTXO
+        let utxoCounter = 1;
+
         for (const p of participants) {
-          if (p.role === 'student') {
-            p.simulationBalance = 100;
-            p.totalEnergySpent = 0;
-          }
+          const addr = store.generateBitcoinAddress(roomId, p.id);
+          store.createPhase9UTXO(roomId, {
+            utxoId: `UTXO#${utxoCounter}`,
+            address: addr.address,
+            ownerId: p.id,
+            amount: 50,
+          });
+          utxoCounter++;
         }
+
+        // Create genesis block
+        const genesisHash = createHash('sha256')
+          .update('1:0000000000000000:[]:0')
+          .digest('hex');
+        store.createBlock(roomId, {
+          blockNumber: 1,
+          previousHash: '0000000000000000',
+          status: 'mined',
+          difficulty: room.currentDifficulty,
+          reward: 0,
+          transactions: '[]',
+          selectedTxIds: [],
+          totalFees: 0,
+          nonce: 0,
+          hash: genesisHash,
+          minedAt: new Date(),
+          minerId: null,
+        });
 
         store.updateRoom(roomId, {
           simulationStarted: true,
-          activeChallenge: null,
-          challengeData: null,
+          currentBlockReward: 50,
+          totalBtcEmitted: 0,
         });
 
         if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, message: 'Simulation started' });
+        return NextResponse.json({ success: true, message: 'Phase 9 initialized' });
       }
 
-      case 'reset-simulation': {
-        for (const p of participants) {
-          if (p.role === 'student') {
-            p.simulationBalance = 100;
-            p.totalEnergySpent = 0;
-            p.blocksMinedCount = 0;
-            p.totalMiningReward = 0;
-            p.hashAttempts = 0;
-          }
-        }
+      // ---- Reset Phase 9 ----
+      case 'reset-phase9': {
+        store.deletePhase9DataByRoom(roomId);
+        store.deleteBlocksByRoom(roomId);
 
         store.updateRoom(roomId, {
-          activeChallenge: null,
-          challengeData: null,
           simulationStarted: false,
           currentBlockReward: 50,
           totalBtcEmitted: 0,
-          currentDifficulty: 2,
         });
 
-        store.deleteBlocksByRoom(roomId);
-        store.deleteMempoolTransactionsByRoom(roomId);
-
         if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, message: 'Simulation reset' });
+        return NextResponse.json({ success: true, message: 'Phase 9 reset' });
       }
 
-      case 'update-role': {
-        const { participantId, newRole } = data;
-        if (!participantId || !newRole) {
-          return NextResponse.json({ error: 'Participant ID and new role required' }, { status: 400 });
+      // ---- Fund all nodes: give 50 BTC to every participant without UTXOs ----
+      case 'fund-all-nodes': {
+        let utxoCounter = store.getPhase9UTXOsByRoom(roomId).length + 1;
+        let funded = 0;
+
+        for (const p of participants) {
+          const existingUtxos = store.getPhase9UTXOsByRoom(roomId)
+            .filter(u => u.ownerId === p.id && !u.isSpent);
+
+          if (existingUtxos.length === 0) {
+            // Generate address if needed
+            let addr = store.getPhase9AddressesByRoom(roomId).find(a => a.ownerId === p.id);
+            if (!addr) {
+              addr = store.generateBitcoinAddress(roomId, p.id);
+            }
+            store.createPhase9UTXO(roomId, {
+              utxoId: `UTXO#${utxoCounter}`,
+              address: addr.address,
+              ownerId: p.id,
+              amount: 50,
+            });
+            utxoCounter++;
+            funded++;
+          }
         }
 
-        store.updateParticipant(participantId, { simulationRole: newRole });
         if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, message: 'Role updated' });
+        return NextResponse.json({ success: true, funded });
       }
 
-      case 'launch-challenge': {
-        const { challengeType } = data;
-        const validChallenges = ['51_attack', 'congestion', 'fork', 'economy', 'environment'];
-
-        if (!challengeType || !validChallenges.includes(challengeType)) {
-          return NextResponse.json({ error: 'Invalid challenge type' }, { status: 400 });
+      // ---- Generate new Bitcoin address ----
+      case 'generate-address': {
+        const { participantId } = data;
+        if (!participantId) {
+          return NextResponse.json({ error: 'Participant ID required' }, { status: 400 });
         }
 
-        let challengeData: Record<string, unknown> = {
-          type: challengeType,
-          startedAt: new Date().toISOString()
+        const addr = store.generateBitcoinAddress(roomId, participantId);
+
+        if (roomCode) broadcastRoomUpdate(roomCode);
+        return NextResponse.json({
+          success: true,
+          address: {
+            id: addr.id,
+            address: addr.address,
+            roomId: addr.roomId,
+            ownerId: addr.ownerId,
+            createdAt: addr.createdAt.toISOString(),
+          },
+        });
+      }
+
+      // ---- Create UTXO-based transaction with addresses ----
+      case 'create-transaction': {
+        const { participantId, inputUtxoIds, outputs, fee } = data as {
+          participantId: string;
+          inputUtxoIds: string[];
+          outputs: { address: string; amount: number }[];
+          fee: number;
         };
 
-        if (challengeType === '51_attack') {
-          const students = participants.filter(p => p.role === 'student');
-          const midpoint = Math.ceil(students.length / 2);
-          challengeData.honestGroup = students.slice(0, midpoint).map(s => s.id);
-          challengeData.attackingGroup = students.slice(midpoint).map(s => s.id);
-          challengeData.mainChainLength = 0;
-          challengeData.alternativeChainLength = 0;
-        } else if (challengeType === 'fork') {
-          const blocks = store.getBlocksByRoom(roomId)
-            .filter(b => b.status === 'mined')
-            .sort((a, b) => b.blockNumber - a.blockNumber);
-          challengeData.forkBlockNumber = blocks[0]?.blockNumber || 0;
-          challengeData.forkDetected = false;
-        } else if (challengeType === 'congestion') {
-          challengeData.congestionLevel = 0;
+        if (!participantId || !inputUtxoIds?.length || !outputs?.length) {
+          return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        store.updateRoom(roomId, {
-          activeChallenge: challengeType,
-          challengeData: JSON.stringify(challengeData),
-        });
-
-        if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, challengeData });
-      }
-
-      case 'end-challenge': {
-        store.updateRoom(roomId, { activeChallenge: null, challengeData: null });
-        if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, message: 'Challenge ended' });
-      }
-
-      case 'create-transaction': {
-        const { senderId, receiverId, amount, fee = 0 } = data;
-
-        const sender = store.getParticipant(senderId);
-        if (!sender || (sender.simulationBalance || 0) < amount + fee) {
-          return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
+        // Validate and collect input UTXOs
+        const inputUtxos = [];
+        for (const utxoId of inputUtxoIds) {
+          const utxo = store.getPhase9UTXO(utxoId);
+          if (!utxo) {
+            return NextResponse.json({ error: `UTXO ${utxoId} not found` }, { status: 400 });
+          }
+          if (utxo.ownerId !== participantId) {
+            return NextResponse.json({ error: `UTXO ${utxo.utxoId} does not belong to you` }, { status: 400 });
+          }
+          if (utxo.isSpent) {
+            return NextResponse.json({ error: `UTXO ${utxo.utxoId} is already spent` }, { status: 400 });
+          }
+          inputUtxos.push(utxo);
         }
 
-        // Deduct from sender balance
-        sender.simulationBalance -= (amount + fee);
+        const totalInput = inputUtxos.reduce((sum, u) => sum + u.amount, 0);
+        const totalOutput = outputs.reduce((sum, o) => sum + o.amount, 0);
+        const feeAmount = Math.round((fee || 0) * 10) / 10; // 1 decimal
+
+        // Validate conservation: inputs must cover outputs + fee
+        if (Math.round((totalOutput + feeAmount) * 10) / 10 > Math.round(totalInput * 10) / 10) {
+          return NextResponse.json({
+            error: 'Insufficient inputs: outputs + fee exceed input total'
+          }, { status: 400 });
+        }
+
+        // Calculate change
+        const changeAmount = Math.round((totalInput - totalOutput - feeAmount) * 10) / 10;
+
+        // Mark input UTXOs as spent
+        const txCount = store.countPhase9MempoolTxs(roomId);
+        const txId = `TX#${txCount + 1}`;
+
+        for (const utxo of inputUtxos) {
+          store.updatePhase9UTXO(utxo.id, { isSpent: true, spentInTxId: txId });
+        }
+
+        // Build input summaries for display
+        const inputSummaries = inputUtxos.map(u => ({
+          address: u.address,
+          amount: u.amount,
+        }));
+
+        // Build output UTXOs
+        let utxoCount = store.countPhase9UTXOs(roomId);
+        const txOutputs = [];
+
+        for (const output of outputs) {
+          utxoCount++;
+          const newUtxoId = `UTXO#${utxoCount}`;
+
+          // Check if destination address exists (has an owner)
+          const destAddr = store.findPhase9AddressByString(roomId, output.address);
+          const destOwnerId = destAddr?.ownerId || ''; // empty = burned
+
+          // Create the output UTXO (even if burned — the UTXO exists but is unclaimable)
+          store.createPhase9UTXO(roomId, {
+            utxoId: newUtxoId,
+            address: output.address,
+            ownerId: destOwnerId,
+            amount: Math.round(output.amount * 10) / 10,
+            createdInTxId: txId,
+          });
+
+          txOutputs.push({
+            address: output.address,
+            amount: Math.round(output.amount * 10) / 10,
+            isChange: false,
+            newUtxoId,
+          });
+        }
+
+        // Auto-generate change output if there's change
+        let changeAddress = '';
+        if (changeAmount > 0) {
+          utxoCount++;
+          const newUtxoId = `UTXO#${utxoCount}`;
+          const changeAddr = store.generateBitcoinAddress(roomId, participantId);
+          changeAddress = changeAddr.address;
+
+          store.createPhase9UTXO(roomId, {
+            utxoId: newUtxoId,
+            address: changeAddr.address,
+            ownerId: participantId,
+            amount: changeAmount,
+            createdInTxId: txId,
+          });
+
+          txOutputs.push({
+            address: changeAddr.address,
+            amount: changeAmount,
+            isChange: true,
+            newUtxoId,
+          });
+        }
 
         // Create mempool transaction
-        const txCount = store.countMempoolTransactions(roomId);
-        const txId = `SIM-TX#${txCount + 1}`;
-
-        const transaction = store.createMempoolTransaction(roomId, {
+        const mempoolTx = store.createPhase9MempoolTx(roomId, {
           txId,
-          senderId,
-          receiverId,
-          amount,
-          fee,
+          senderParticipantId: participantId,
+          inputUtxoIds,
+          inputs: inputSummaries,
+          outputs: txOutputs,
+          totalInput,
+          totalOutput: totalOutput + changeAmount,
+          fee: feeAmount,
           status: 'in_mempool',
-          propagatedTo: [senderId],
-          propagationProgress: 100,
         });
+
+        // Check for burned outputs (address not found)
+        const burnedOutputs = outputs.filter(o => !store.findPhase9AddressByString(roomId, o.address));
 
         if (roomCode) broadcastRoomUpdate(roomCode);
         return NextResponse.json({
           success: true,
           transaction: {
-            ...transaction,
-            sender: store.getParticipant(senderId),
-            receiver: store.getParticipant(receiverId),
-          }
+            ...mempoolTx,
+            createdAt: mempoolTx.createdAt.toISOString(),
+          },
+          changeAddress: changeAddress || null,
+          changeAmount,
+          burnedOutputs: burnedOutputs.map(o => o.address),
         });
       }
 
-      case 'mine-block': {
-        const { minerId, nonce, hash, selectedTxIds = [] } = data;
+      // ---- Auto-mine tick (same pattern as Phase 8) ----
+      case 'auto-mine-tick': {
+        let blocks = store.getBlocksByRoom(roomId);
 
-        // Get current pending block or create one
-        const blocks = store.getBlocksByRoom(roomId);
-        let pendingBlock = blocks.find(b => b.status === 'pending');
-
-        if (!pendingBlock) {
-          const lastBlock = blocks
-            .filter(b => b.status === 'mined')
-            .sort((a, b) => b.blockNumber - a.blockNumber)[0] || null;
-
-          const newBlockNumber = (lastBlock?.blockNumber || 0) + 1;
-          const previousHash = lastBlock?.hash || '0'.repeat(64);
-
-          pendingBlock = store.createBlock(roomId, {
-            blockNumber: newBlockNumber,
-            previousHash,
-            difficulty: room.currentDifficulty,
-            reward: Math.round(room.currentBlockReward),
-            status: 'pending',
-          });
-        }
-
-        // Verify hash meets difficulty
-        const requiredPrefix = '0'.repeat(pendingBlock.difficulty);
-        if (!hash.startsWith(requiredPrefix)) {
-          return NextResponse.json({ error: 'Invalid hash - does not meet difficulty requirement' }, { status: 400 });
-        }
-
-        // Get selected mempool transactions
-        const allMempoolTxs = store.getMempoolTransactionsByRoom(roomId);
-        const selectedTxs = allMempoolTxs.filter(tx => selectedTxIds.includes(tx.id) && tx.status === 'in_mempool');
-
-        const totalFees = selectedTxs.reduce((sum, tx) => sum + tx.fee, 0);
-        const totalReward = pendingBlock.reward + totalFees;
-
-        // Mark transactions as confirmed and credit receivers
-        for (const tx of selectedTxs) {
-          tx.status = 'confirmed';
-          const receiver = store.getParticipant(tx.receiverId);
-          if (receiver) {
-            receiver.simulationBalance += tx.amount;
+        // Guard: reject if last block was mined too recently
+        const minedBlocks = blocks.filter(b => b.status === 'mined');
+        if (minedBlocks.length > 0) {
+          const lastMined = minedBlocks.reduce((a, b) => a.blockNumber > b.blockNumber ? a : b);
+          if (lastMined.minedAt) {
+            const elapsed = (Date.now() - new Date(lastMined.minedAt).getTime()) / 1000;
+            const minInterval = (room.autoMineInterval || 20) * 0.7;
+            if (elapsed < minInterval) {
+              return NextResponse.json({ success: false, skipped: true, message: 'Too soon since last block' });
+            }
           }
         }
 
-        // Update miner stats and balance
-        const miner = store.getParticipant(minerId);
-        if (miner) {
-          miner.blocksMinedCount += 1;
-          miner.totalMiningReward += totalReward;
-          miner.simulationBalance += totalReward;
-          miner.totalEnergySpent += 1;
+        // Auto-create genesis block if none exists
+        if (blocks.length === 0) {
+          const genesisHash = createHash('sha256')
+            .update('1:0000000000000000:[]:0')
+            .digest('hex');
+          store.createBlock(roomId, {
+            blockNumber: 1,
+            previousHash: '0000000000000000',
+            status: 'mined',
+            difficulty: room.currentDifficulty,
+            reward: 0,
+            transactions: '[]',
+            selectedTxIds: [],
+            totalFees: 0,
+            nonce: 0,
+            hash: genesisHash,
+            minedAt: new Date(),
+            minerId: null,
+          });
+          blocks = store.getBlocksByRoom(roomId);
         }
 
-        // Update block as mined
-        store.updateBlock(pendingBlock.id, {
-          status: 'mined',
-          nonce,
-          hash,
-          minerId,
-          minedAt: new Date(),
-          selectedTxIds,
-          totalFees,
+        // Clean up any stale pending blocks
+        const existingPending = blocks.find(b => b.status === 'pending');
+        if (existingPending) {
+          store.updateBlock(existingPending.id, { status: 'mined', minedAt: new Date(), hash: 'auto', nonce: 0 });
+        }
+
+        const lastBlock = blocks
+          .filter(b => b.status === 'mined')
+          .sort((a, b) => b.blockNumber - a.blockNumber)[0] || null;
+
+        const newBlockNumber = (lastBlock?.blockNumber ?? 0) + 1;
+        const previousHash = lastBlock?.hash || '0000000000000000';
+
+        // Select top N Phase 9 mempool transactions by fee
+        const capacity = room.autoMineCapacity || 3;
+        const mempoolTxs = store.getPhase9MempoolTxsByRoom(roomId)
+          .filter(tx => tx.status === 'in_mempool')
+          .sort((a, b) => b.fee - a.fee)
+          .slice(0, capacity);
+
+        const totalFees = Math.round(mempoolTxs.reduce((sum, tx) => sum + tx.fee, 0) * 10) / 10;
+        const selectedTxIds = mempoolTxs.map(tx => tx.id);
+
+        // Build transaction summaries for block display (using addresses, not names)
+        const txSummaries = mempoolTxs.map(tx => {
+          // First input address as "sender", first non-change output as "receiver"
+          const senderAddr = tx.inputs[0]?.address || '???';
+          const receiverOutput = tx.outputs.find(o => !o.isChange) || tx.outputs[0];
+          return {
+            sender: senderAddr,
+            receiver: receiverOutput?.address || '???',
+            amount: receiverOutput?.amount || 0,
+            fee: tx.fee,
+          };
         });
 
-        const minedBlock = store.getBlock(pendingBlock.id)!;
+        const currentReward = Math.round(room.currentBlockReward * 10) / 10;
+        const blockHash = createHash('sha256')
+          .update(`${newBlockNumber}:${previousHash}:${JSON.stringify(txSummaries)}:auto`)
+          .digest('hex');
 
-        // Update room stats
-        room.totalBtcEmitted += pendingBlock.reward;
+        const newBlock = store.createBlock(roomId, {
+          blockNumber: newBlockNumber,
+          previousHash,
+          status: 'mined',
+          difficulty: room.currentDifficulty,
+          reward: currentReward,
+          transactions: JSON.stringify(txSummaries),
+          selectedTxIds,
+          totalFees,
+          nonce: 0,
+          hash: blockHash,
+          minedAt: new Date(),
+          minerId: null,
+        });
 
-        // Check for halving
-        if (minedBlock.blockNumber % room.halvingInterval === 0 && room.currentBlockReward > 0.01) {
-          room.currentBlockReward = room.currentBlockReward / 2;
+        // Mark selected mempool transactions as confirmed
+        for (const txId of selectedTxIds) {
+          store.updatePhase9MempoolTx(txId, { status: 'confirmed' });
         }
+
+        // Update total BTC emitted
+        store.updateRoom(roomId, { totalBtcEmitted: room.totalBtcEmitted + currentReward });
 
         if (roomCode) broadcastRoomUpdate(roomCode);
         return NextResponse.json({
           success: true,
-          block: { ...minedBlock, miner: store.getParticipant(minerId) },
-          reward: totalReward,
-          feesEarned: totalFees
+          block: {
+            ...newBlock,
+            miner: null,
+            transactions: txSummaries,
+            selectedTxIds,
+            totalFees,
+          },
+          includedTxCount: mempoolTxs.length,
+          totalFees,
+          reward: currentReward,
         });
       }
 
-      case 'fill-mempool': {
-        const students = participants.filter(p => p.role === 'student' && p.isActive);
-        if (students.length < 2) {
-          return NextResponse.json({ error: 'Need at least 2 students' }, { status: 400 });
-        }
+      // ---- Update auto-mine settings (teacher) ----
+      case 'update-settings': {
+        const { autoMineInterval, autoMineCapacity } = data;
+        const updates: { autoMineInterval?: number; autoMineCapacity?: number } = {};
 
-        const txCount = store.countMempoolTransactions(roomId);
-        const transactions = [];
-
-        for (let i = 0; i < 20; i++) {
-          const sender = students[Math.floor(Math.random() * students.length)];
-          let receiver = students[Math.floor(Math.random() * students.length)];
-          while (receiver.id === sender.id) {
-            receiver = students[Math.floor(Math.random() * students.length)];
+        if (autoMineInterval !== undefined) {
+          if (autoMineInterval < 10 || autoMineInterval > 60) {
+            return NextResponse.json({ error: 'Interval must be 10-60 seconds' }, { status: 400 });
           }
-
-          const amount = Math.floor(Math.random() * 5) + 1;
-          const fee = Math.floor(Math.random() * 10) + 1;
-
-          transactions.push({
-            txId: `SIM-TX#${txCount + i + 1}`,
-            senderId: sender.id,
-            receiverId: receiver.id,
-            amount,
-            fee,
-            status: 'in_mempool',
-            propagatedTo: [sender.id],
-            propagationProgress: 100,
-          });
+          updates.autoMineInterval = autoMineInterval;
         }
 
-        store.createManyMempoolTransactions(roomId, transactions);
-
-        // Update challenge data if congestion challenge is active
-        if (room.activeChallenge === 'congestion') {
-          const currentData = room.challengeData ? JSON.parse(room.challengeData) : {};
-          currentData.congestionLevel = (currentData.congestionLevel || 0) + 20;
-          store.updateRoom(roomId, { challengeData: JSON.stringify(currentData) });
+        if (autoMineCapacity !== undefined) {
+          if (autoMineCapacity < 1 || autoMineCapacity > 10) {
+            return NextResponse.json({ error: 'Capacity must be 1-10' }, { status: 400 });
+          }
+          updates.autoMineCapacity = autoMineCapacity;
         }
 
+        store.updateRoom(roomId, updates);
         if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, created: transactions.length });
-      }
-
-      case 'accelerate-halvings': {
-        const { halvingCount = 3 } = data;
-        let currentReward = room.currentBlockReward;
-
-        for (let i = 0; i < halvingCount; i++) {
-          currentReward = currentReward / 2;
-          if (currentReward < 0.01) break;
-        }
-
-        store.updateRoom(roomId, { currentBlockReward: currentReward });
-
-        if (roomCode) broadcastRoomUpdate(roomCode);
-        return NextResponse.json({ success: true, newReward: currentReward });
+        return NextResponse.json({ success: true, ...updates });
       }
 
       default:
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
   } catch (error) {
-    console.error('Error in simulation action:', error);
+    console.error('Error in Phase 9 action:', error);
     return NextResponse.json({ error: 'Failed to perform action' }, { status: 500 });
   }
 }

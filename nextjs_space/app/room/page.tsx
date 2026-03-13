@@ -136,15 +136,16 @@ export default function RoomPage() {
     autoMineSettings,
     // Phase 9
     simulationStats,
-    startSimulation,
-    resetSimulation,
-    updateSimulationRole,
-    launchChallenge,
-    endChallenge,
-    createSimulationTransaction,
-    mineSimulationBlock,
-    fillSimulationMempool,
-    accelerateHalvings,
+    phase9Addresses,
+    phase9Utxos,
+    phase9MempoolTxs,
+    initPhase9,
+    resetPhase9,
+    fundAllPhase9Nodes,
+    generateAddress,
+    createPhase9Transaction,
+    autoMineTickPhase9,
+    updatePhase9Settings,
     updateParticipantCoinFile,
     refetch,
   } = useRoomPolling({
@@ -377,11 +378,13 @@ export default function RoomPage() {
           room={room}
           participant={currentParticipant!}
           blocks={blocks}
-          mempoolTransactions={mempoolTransactions}
-          simulationStats={simulationStats}
-          onUpdateRole={updateSimulationRole}
-          onCreateTransaction={createSimulationTransaction}
-          onMineBlock={mineSimulationBlock}
+          addresses={phase9Addresses}
+          utxos={phase9Utxos}
+          mempoolTxs={phase9MempoolTxs}
+          autoMineSettings={autoMineSettings}
+          onGenerateAddress={generateAddress}
+          onCreateTransaction={createPhase9Transaction}
+          onAutoMineTick={autoMineTickPhase9}
         />
       );
     }
@@ -511,12 +514,15 @@ export default function RoomPage() {
             onUpdatePhase8Settings={updatePhase8Settings}
             // Phase 9
             simulationStats={simulationStats}
-            onStartSimulation={startSimulation}
-            onResetSimulation={resetSimulation}
-            onLaunchChallenge={launchChallenge}
-            onEndChallenge={endChallenge}
-            onFillSimulationMempool={fillSimulationMempool}
-            onAccelerateHalvings={accelerateHalvings}
+            phase9Addresses={phase9Addresses}
+            phase9Utxos={phase9Utxos}
+            phase9MempoolTxs={phase9MempoolTxs}
+            onInitPhase9={initPhase9}
+            onResetPhase9={resetPhase9}
+            onUpdatePhase9Settings={updatePhase9Settings}
+            onFundAllPhase9Nodes={fundAllPhase9Nodes}
+            onGeneratePhase9Address={generateAddress}
+            onCreatePhase9Transaction={createPhase9Transaction}
             onUpdateParticipantBalance={updateParticipantCoinFile}
             onTeacherSendUtxo={teacherSendUtxo}
             onProposeTransaction={async (senderId, receiverId, amount, proposedById) => {
