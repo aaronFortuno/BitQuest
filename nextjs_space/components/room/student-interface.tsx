@@ -11,21 +11,10 @@ import {
   AlertTriangle,
   Save,
 } from 'lucide-react';
-import { Room, Participant, Transaction, CoinFile } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
-interface StudentInterfaceProps {
-  room: Room;
-  participant: Participant | null;
-  onSendTransaction: (receiverId: string, amount: number) => Promise<Transaction | null>;
-  onUpdateCoinFile: (coinFile: string) => Promise<void>;
-}
-
-export default function StudentInterface({
-  room,
-  participant,
-  onSendTransaction,
-  onUpdateCoinFile,
-}: StudentInterfaceProps) {
+export default function StudentInterface() {
+  const { room, participant, sendTransaction, updateCoinFile } = useRoom();
   const { t } = useTranslation();
   const [coinFileText, setCoinFileText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -49,7 +38,7 @@ export default function StudentInterface({
   const transactions = room?.transactions ?? [];
 
   const handleSaveFile = async () => {
-    await onUpdateCoinFile(coinFileText);
+    await updateCoinFile(coinFileText);
     setIsEditing(false);
     setIsDirty(false);
   };
@@ -76,7 +65,7 @@ export default function StudentInterface({
     const newBalance = currentBalance - amountNum;
 
     setSending(true);
-    const tx = await onSendTransaction(selectedReceiver, amountNum);
+    const tx = await sendTransaction(selectedReceiver, amountNum, 0);
     setSending(false);
 
     if (tx) {

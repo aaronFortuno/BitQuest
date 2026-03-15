@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 // GET: Fetch Phase 9 state (addresses, UTXOs, mempool txs)
@@ -79,8 +78,6 @@ export async function POST(request: NextRequest) {
 
     const room = state.room;
     const participants = Array.from(state.participants.values()).filter(p => p.isActive);
-    const roomCode = store.getRoomCodeById(roomId);
-
     switch (action) {
 
       // ---- Initialize Phase 9 ----
@@ -129,7 +126,7 @@ export async function POST(request: NextRequest) {
           totalBtcEmitted: 0,
         });
 
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({ success: true, message: 'Phase 9 initialized' });
       }
 
@@ -144,7 +141,7 @@ export async function POST(request: NextRequest) {
           totalBtcEmitted: 0,
         });
 
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({ success: true, message: 'Phase 9 reset' });
       }
 
@@ -174,7 +171,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({ success: true, funded });
       }
 
@@ -187,7 +184,7 @@ export async function POST(request: NextRequest) {
 
         const addr = store.generateBitcoinAddress(roomId, participantId);
 
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({
           success: true,
           address: {
@@ -326,7 +323,7 @@ export async function POST(request: NextRequest) {
         // Check for burned outputs (address not found)
         const burnedOutputs = outputs.filter(o => !store.findPhase9AddressByString(roomId, o.address));
 
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({
           success: true,
           transaction: {
@@ -442,7 +439,7 @@ export async function POST(request: NextRequest) {
         // Update total BTC emitted
         store.updateRoom(roomId, { totalBtcEmitted: room.totalBtcEmitted + currentReward });
 
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({
           success: true,
           block: {
@@ -478,7 +475,7 @@ export async function POST(request: NextRequest) {
         }
 
         store.updateRoom(roomId, updates);
-        if (roomCode) broadcastRoomUpdate(roomCode);
+
         return NextResponse.json({ success: true, ...updates });
       }
 

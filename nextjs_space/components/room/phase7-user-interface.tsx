@@ -8,31 +8,9 @@ import {
   CheckCircle, XCircle, TrendingUp, TrendingDown, Minus,
   Info, Settings, Link, ArrowUp, Users,
 } from 'lucide-react';
-import { Room, Participant, Block, MiningPool } from '@/lib/types';
-import { DifficultyInfo } from '@/hooks/use-room-polling';
-import { RigState, BlockEvent } from '@/hooks/use-auto-mining';
+import { useAutoMining, RigState, BlockEvent } from '@/hooks/use-auto-mining';
+import { useRoom } from '@/contexts/room-context';
 import { BlockchainVisualization } from './blockchain-visualization';
-
-interface Phase7UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  blocks: Block[];
-  difficultyInfo?: DifficultyInfo | null;
-  // Auto-mining
-  rigs: RigState[];
-  totalHashrate: number;
-  isAnyMining: boolean;
-  lastBlockEvent: BlockEvent | null;
-  onToggleRig: (rigId: number) => void;
-  onUpgradeRig: (newSpeed: number) => Promise<void>;
-  onCreateGenesisBlock: () => Promise<void>;
-  // Mining pools
-  miningPools: MiningPool[];
-  poolsEnabled: boolean;
-  onCreatePool: (name: string) => Promise<{ success: boolean; error?: string }>;
-  onJoinPool: (poolId: string) => Promise<{ success: boolean; error?: string }>;
-  onLeavePool: (poolId: string) => Promise<{ success: boolean; error?: string }>;
-}
 
 function RigCard({
   rig,
@@ -132,25 +110,38 @@ function RigCard({
   );
 }
 
-export function Phase7UserInterface({
-  room,
-  participant,
-  blocks,
-  difficultyInfo,
-  rigs,
-  totalHashrate,
-  isAnyMining,
-  lastBlockEvent,
-  onToggleRig,
-  onUpgradeRig,
-  onCreateGenesisBlock,
-  miningPools,
-  poolsEnabled,
-  onCreatePool,
-  onJoinPool,
-  onLeavePool,
-}: Phase7UserInterfaceProps) {
+export function Phase7UserInterface() {
   const { t } = useTranslation();
+  const {
+    room,
+    participant,
+    blocks,
+    difficultyInfo,
+    miningPools,
+    poolsEnabled,
+    upgradeRig,
+    createGenesisBlock,
+    createPendingBlock,
+    submitMinedBlock,
+    batchHashUpdate,
+    createPool,
+    joinPool,
+    leavePool,
+  } = useRoom();
+
+  const autoMining = useAutoMining({
+    room: room!,
+    participant: participant!,
+    blocks,
+    enabled: !!participant && !!room,
+    onCreatePendingBlock: createPendingBlock,
+    onSubmitBlock: submitMinedBlock,
+    onBatchHashUpdate: batchHashUpdate,
+  });
+
+  const { rigs, totalHashrate, isAnyMining, lastBlockEvent, toggleRig: onToggleRig } = autoMining;
+  if (!room || !participant) return null;
+
   const pendingBlock = blocks.find(b => b.status === 'pending');
   const minedBlocks = blocks.filter(b => b.status === 'mined').sort((a, b) => b.blockNumber - a.blockNumber);
   const hasGenesis = blocks.some(b => b.status === 'mined' && b.blockNumber === 1);
@@ -414,7 +405,7 @@ export function Phase7UserInterface({
               <button
                 onClick={async () => {
                   setPoolLoading(true);
-                  await onLeavePool(myPool.id);
+                  await leavePool(myPool.id);
                   setPoolLoading(false);
                 }}
                 disabled={poolLoading}
@@ -442,7 +433,7 @@ export function Phase7UserInterface({
                   onClick={async () => {
                     if (!poolName.trim()) return;
                     setPoolLoading(true);
-                    await onCreatePool(poolName.trim());
+                    await createPool(poolName.trim());
                     setPoolName('');
                     setPoolLoading(false);
                   }}
@@ -471,7 +462,7 @@ export function Phase7UserInterface({
                       <button
                         onClick={async () => {
                           setPoolLoading(true);
-                          await onJoinPool(pool.id);
+                          await joinPool(pool.id);
                           setPoolLoading(false);
                         }}
                         disabled={poolLoading}
@@ -508,7 +499,7 @@ export function Phase7UserInterface({
                 maxRigs={maxRigs}
                 allowUpgrade={allowUpgrade}
                 onToggle={() => onToggleRig(rig.id)}
-                onUpgrade={onUpgradeRig}
+                onUpgrade={upgradeRig}
               />
             ))}
           </div>

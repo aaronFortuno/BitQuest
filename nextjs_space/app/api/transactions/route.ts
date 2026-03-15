@@ -1,22 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
-
-
-// Helper function to update coin file balance
-function updateCoinFileBalance(coinFile: string, delta: number): string {
-  try {
-    const data = JSON.parse(coinFile);
-    if (typeof data.saldo === 'number') {
-      data.saldo = data.saldo + delta;
-    } else {
-      data.saldo = delta;
-    }
-    return JSON.stringify(data, null, 2);
-  } catch {
-    return JSON.stringify({ saldo: delta }, null, 2);
-  }
-}
+import { updateBalance } from '@/lib/balance-utils';
 
 // Create a new transaction
 export async function POST(req: NextRequest) {
@@ -63,15 +47,13 @@ export async function POST(req: NextRequest) {
       if (transaction.votesFor >= majorityNeeded) {
         store.updateTransaction(transaction.id, { status: 'approved' });
         store.updateParticipant(senderId, {
-          coinFile: updateCoinFileBalance(sender.coinFile, -parsedAmount),
+          coinFile: updateBalance(sender.coinFile, -parsedAmount),
         });
         store.updateParticipant(receiverId, {
-          coinFile: updateCoinFileBalance(receiver.coinFile, parsedAmount),
+          coinFile: updateBalance(receiver.coinFile, parsedAmount),
         });
       }
 
-      const roomCode = store.getRoomCodeById(roomId);
-      if (roomCode) broadcastRoomUpdate(roomCode);
       return NextResponse.json({
         transaction: { ...transaction, sender, receiver }
       });
@@ -88,16 +70,14 @@ export async function POST(req: NextRequest) {
         isFlagged: false,
       });
 
-      const roomCode1 = store.getRoomCodeById(roomId);
-      if (roomCode1) broadcastRoomUpdate(roomCode1);
       return NextResponse.json({
         transaction: { ...transaction, sender, receiver }
       });
     }
 
     // Phase 0: Create approved transaction and update balances immediately
-    const newSenderCoinFile = updateCoinFileBalance(sender.coinFile, -parsedAmount);
-    const newReceiverCoinFile = updateCoinFileBalance(receiver.coinFile, parsedAmount);
+    const newSenderCoinFile = updateBalance(sender.coinFile, -parsedAmount);
+    const newReceiverCoinFile = updateBalance(receiver.coinFile, parsedAmount);
 
     const transaction = store.createTransaction(roomId, {
       senderId,
@@ -111,8 +91,6 @@ export async function POST(req: NextRequest) {
     store.updateParticipant(senderId, { coinFile: newSenderCoinFile });
     store.updateParticipant(receiverId, { coinFile: newReceiverCoinFile });
 
-    const roomCode0 = store.getRoomCodeById(roomId);
-    if (roomCode0) broadcastRoomUpdate(roomCode0);
     return NextResponse.json({
       transaction: { ...transaction, sender: { ...sender, coinFile: newSenderCoinFile }, receiver: { ...receiver, coinFile: newReceiverCoinFile } }
     });

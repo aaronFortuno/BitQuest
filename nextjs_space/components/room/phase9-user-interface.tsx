@@ -7,37 +7,22 @@ import {
   Send, Clock, ArrowRight, Info, Plus, Copy, Check,
   CheckCircle, XCircle, ArrowDown, Wallet, Trash2,
 } from 'lucide-react';
-import { Room, Participant, Block, BitcoinAddress, Phase9UTXO, Phase9MempoolTransaction } from '@/lib/types';
+import { Phase9UTXO } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
-interface Phase9UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  blocks: Block[];
-  addresses: BitcoinAddress[];
-  utxos: Phase9UTXO[];
-  mempoolTxs: Phase9MempoolTransaction[];
-  autoMineSettings: { autoMineInterval: number; autoMineCapacity: number };
-  onGenerateAddress: () => Promise<{ success: boolean; address?: BitcoinAddress; error?: string }>;
-  onCreateTransaction: (
-    inputUtxoIds: string[],
-    outputs: { address: string; amount: number }[],
-    fee: number
-  ) => Promise<{ success: boolean; changeAddress?: string; changeAmount?: number; burnedOutputs?: string[]; error?: string }>;
-  onAutoMineTick: () => Promise<{ success: boolean; includedTxCount?: number; totalFees?: number; halvingEvent?: { previousReward: number; newReward: number }; error?: string }>;
-}
-
-export default function Phase9UserInterface({
-  room,
-  participant,
-  blocks,
-  addresses,
-  utxos,
-  mempoolTxs,
-  autoMineSettings,
-  onGenerateAddress,
-  onCreateTransaction,
-  onAutoMineTick,
-}: Phase9UserInterfaceProps) {
+export default function Phase9UserInterface() {
+  const {
+    room,
+    participant,
+    blocks,
+    phase9Addresses: addresses,
+    phase9Utxos: utxos,
+    phase9MempoolTxs: mempoolTxs,
+    autoMineSettings,
+    generateAddress: onGenerateAddress,
+    createPhase9Transaction: onCreateTransaction,
+    autoMineTickPhase9: onAutoMineTick,
+  } = useRoom();
   const { t } = useTranslation();
 
   // Transaction state
@@ -60,13 +45,13 @@ export default function Phase9UserInterface({
 
   // Derived data
   const myAddresses = useMemo(() =>
-    addresses.filter(a => a.ownerId === participant.id),
-    [addresses, participant.id]
+    addresses.filter(a => a.ownerId === participant?.id),
+    [addresses, participant?.id]
   );
 
   const myUtxos = useMemo(() =>
-    utxos.filter(u => u.ownerId === participant.id && !u.isSpent),
-    [utxos, participant.id]
+    utxos.filter(u => u.ownerId === participant?.id && !u.isSpent),
+    [utxos, participant?.id]
   );
 
   const myBalance = useMemo(() =>
@@ -245,6 +230,8 @@ export default function Phase9UserInterface({
     }
     return map;
   }, [myUtxos]);
+
+  if (!room || !participant) return null;
 
   return (
     <div className="space-y-4">

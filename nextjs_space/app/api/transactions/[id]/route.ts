@@ -1,22 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
-
-
-// Helper function to update coin file balance
-function updateCoinFileBalance(coinFile: string, delta: number): string {
-  try {
-    const data = JSON.parse(coinFile);
-    if (typeof data.saldo === 'number') {
-      data.saldo = data.saldo + delta;
-    } else {
-      data.saldo = delta;
-    }
-    return JSON.stringify(data, null, 2);
-  } catch {
-    return JSON.stringify({ saldo: delta }, null, 2);
-  }
-}
+import { updateBalance } from '@/lib/balance-utils';
 
 // Update transaction (approve, reject, highlight)
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -44,16 +28,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
 
       // Update balances and transaction status
-      const newSenderCoinFile = updateCoinFileBalance(sender.coinFile, -transaction.amount);
-      const newReceiverCoinFile = updateCoinFileBalance(receiver.coinFile, transaction.amount);
+      const newSenderCoinFile = updateBalance(sender.coinFile, -transaction.amount);
+      const newReceiverCoinFile = updateBalance(receiver.coinFile, transaction.amount);
 
       store.updateTransaction(id, { status: 'approved' });
       store.updateParticipant(transaction.senderId, { coinFile: newSenderCoinFile });
       store.updateParticipant(transaction.receiverId, { coinFile: newReceiverCoinFile });
 
       const updatedTx = store.getTransaction(id);
-      const roomCode = store.getRoomCodeById(transaction.roomId);
-      if (roomCode) broadcastRoomUpdate(roomCode);
       return NextResponse.json({
         transaction: {
           ...updatedTx,
@@ -75,10 +57,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
     }
 
-    if (transaction) {
-      const roomCode2 = store.getRoomCodeById(transaction.roomId);
-      if (roomCode2) broadcastRoomUpdate(roomCode2);
-    }
     return NextResponse.json({
       transaction: {
         ...transaction,

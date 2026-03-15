@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 // GET: Fetch all active node connections for a room
@@ -73,8 +72,6 @@ export async function POST(request: NextRequest) {
     })));
 
     const createdConnections = store.getNodeConnectionsByRoom(roomId).filter(c => c.isActive);
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json(createdConnections);
   } catch (error) {
     console.error('Error initializing node connections:', error);
@@ -111,9 +108,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
-
     // Schedule delayed reconnection for affected nodes
     const affectedNodes = [conn.nodeAId, conn.nodeBId];
     setTimeout(() => {
@@ -127,7 +121,6 @@ export async function DELETE(request: NextRequest) {
           findReconnection(nodeId, roomId);
         }
       }
-      if (roomCode) broadcastRoomUpdate(roomCode);
     }, CONN_RECONNECT_DELAY_MS);
 
     return NextResponse.json({
@@ -155,9 +148,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     const newConn = findReconnection(nodeId, roomId);
-
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
 
     return NextResponse.json({ reconnection: newConn || null });
   } catch (error) {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 import { createInitialCoinFile } from '@/lib/room-utils';
 
 
@@ -49,8 +48,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const updatedRoom = { ...state.room, participants, transactions };
 
-    const roomCode = store.getRoomCodeById(id);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json({ room: updatedRoom });
   } catch (error) {
     console.error('Error updating room phase:', error);

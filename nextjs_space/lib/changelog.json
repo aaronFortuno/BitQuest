@@ -1,0 +1,1007 @@
+[
+  {
+    "version": "v0.4.9",
+    "date": "2026-03-14",
+    "changes": {
+      "ca": [
+        "Fase 9: adreces i pseudonimitat — els alumnes envien BTC a adreces bc1q... en lloc de noms, descobrint la privacitat de Bitcoin",
+        "Model UTXO amb adreces: cada alumne comença amb 50 BTC en una adreça generada automàticament",
+        "Múltiples outputs per transacció: es pot enviar a diverses adreces alhora",
+        "Canvi automàtic: el sistema genera una nova adreça de retorn per al canvi",
+        "BTC cremats: si l'adreça de destí no existeix, els BTC es perden per sempre (sense validació)",
+        "Professor com a node: el professor té les mateixes eines (adreces, UTXOs, crear transaccions) per exemplificar a classe",
+        "Botó \"Enviar saldo a tots els nodes\": el professor pot finançar manualment tots els participants amb 50 BTC",
+        "Visor blockchain simplificat: eliminada la recompensa de bloc (innecessària en aquest context)",
+        "Indicador d'inputs al formulari: guia visual per seleccionar UTXOs abans de crear transaccions",
+        "Eliminat panell halving obsolet de la fase 9",
+        "Eliminada barra \"Subsidit reduït\" de la fase 8",
+        "Layout alumne 50/50 com a fase 8",
+        "Dashboard professor fase 9 reorganitzat: activitat alumnes moguda sota mempool per equilibrar columnes"
+      ],
+      "es": [
+        "Fase 9: direcciones y pseudonimato — los alumnos envían BTC a direcciones bc1q... en lugar de nombres, descubriendo la privacidad de Bitcoin",
+        "Modelo UTXO con direcciones: cada alumno empieza con 50 BTC en una dirección generada automáticamente",
+        "Múltiples outputs por transacción: se puede enviar a varias direcciones a la vez",
+        "Cambio automático: el sistema genera una nueva dirección de retorno para el cambio",
+        "BTC quemados: si la dirección de destino no existe, los BTC se pierden para siempre (sin validación)",
+        "Profesor como nodo: el profesor tiene las mismas herramientas (direcciones, UTXOs, crear transacciones) para ejemplificar en clase",
+        "Botón \"Enviar saldo a todos los nodos\": el profesor puede financiar manualmente a todos los participantes con 50 BTC",
+        "Visor blockchain simplificado: eliminada la recompensa de bloque (innecesaria en este contexto)",
+        "Indicador de inputs en el formulario: guía visual para seleccionar UTXOs antes de crear transacciones",
+        "Eliminado panel halving obsoleto de la fase 9",
+        "Eliminada barra \"Subsidio reducido\" de la fase 8",
+        "Layout alumno 50/50 como en fase 8",
+        "Dashboard profesor fase 9 reorganizado: actividad alumnos movida bajo mempool para equilibrar columnas"
+      ],
+      "en": [
+        "Phase 9: addresses & pseudonymity — students send BTC to bc1q... addresses instead of names, discovering Bitcoin privacy",
+        "UTXO model with addresses: each student starts with 50 BTC in an auto-generated address",
+        "Multiple outputs per transaction: send to several addresses at once",
+        "Automatic change: the system generates a new return address for change",
+        "Burned BTC: if the destination address doesn't exist, BTC is lost forever (no validation)",
+        "Teacher as node: teacher has the same tools (addresses, UTXOs, create transactions) to demonstrate in class",
+        "\"Fund all nodes\" button: teacher can manually give all participants 50 BTC",
+        "Simplified blockchain viewer: removed block reward (unnecessary in this context)",
+        "Input indicator in the form: visual guide to select UTXOs before creating transactions",
+        "Removed obsolete halving panel from phase 9",
+        "Removed \"Reduced subsidy\" bar from phase 8",
+        "Student layout 50/50 like phase 8",
+        "Teacher dashboard phase 9 reorganized: student activity moved under mempool to balance columns"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.8",
+    "date": "2026-03-12",
+    "changes": {
+      "ca": [
+        "Fase 8: mercat de comissions — els alumnes envien transaccions amb fee variable i descobreixen que fees més altes = confirmació més ràpida",
+        "Auto-mining: el sistema mina blocs automàticament cada 15-60s (configurable pel professor)",
+        "Capacitat de bloc configurable: el professor ajusta quantes tx caben per bloc (1-8)",
+        "Mempool amb tall visual: línia vermella mostra quines tx entraran al pròxim bloc",
+        "Indicador de probabilitat de confirmació segons la fee triada",
+        "Halving com a demo puntual: el professor pot reduir la recompensa de bloc",
+        "Dashboard professor amb visor mempool idèntic al dels alumnes per projectar a classe",
+        "Header alumne: eliminat badge de saldo (irrellevant a fase 8)",
+        "Icona mempool corregida (Activity en lloc de DollarSign)"
+      ],
+      "es": [
+        "Fase 8: mercado de comisiones — los alumnos envían transacciones con fee variable y descubren que fees más altas = confirmación más rápida",
+        "Auto-mining: el sistema mina bloques automáticamente cada 15-60s (configurable por el profesor)",
+        "Capacidad de bloque configurable: el profesor ajusta cuántas tx caben por bloque (1-8)",
+        "Mempool con corte visual: línea roja muestra qué tx entrarán en el próximo bloque",
+        "Indicador de probabilidad de confirmación según la fee elegida",
+        "Halving como demo puntual: el profesor puede reducir la recompensa de bloque",
+        "Dashboard profesor con visor mempool idéntico al de los alumnos para proyectar en clase",
+        "Header alumno: eliminado badge de saldo (irrelevante en fase 8)",
+        "Icono mempool corregido (Activity en lugar de DollarSign)"
+      ],
+      "en": [
+        "Phase 8: fee market — students send transactions with variable fees and discover that higher fees = faster confirmation",
+        "Auto-mining: the system mines blocks automatically every 15-60s (teacher-configurable)",
+        "Configurable block capacity: teacher adjusts how many tx fit per block (1-8)",
+        "Mempool with visual cut line: red line shows which tx will enter the next block",
+        "Confirmation probability indicator based on chosen fee",
+        "Halving as one-time demo: teacher can reduce block reward",
+        "Teacher dashboard with mempool viewer identical to student view for classroom projection",
+        "Student header: removed balance badge (irrelevant in phase 8)",
+        "Mempool icon fixed (Activity instead of DollarSign)"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.7.1",
+    "date": "2026-03-12",
+    "changes": {
+      "ca": [
+        "Mining Pools: els alumnes poden crear i unir-se a pools de mineria",
+        "Recompensa repartida proporcionalment al hashrate aportat per cada membre del pool",
+        "El professor activa/desactiva pools i veu resum amb hashrate combinat i % xarxa",
+        "Badge de color al ranking de miners per identificar membres de cada pool",
+        "Layout professor reorganitzat: pools + historial (esquerra) | dificultat (dreta)",
+        "Fix: sincronització d'activeRigs al servidor (hashrate del pool ja no mostra 0)",
+        "Fix: distribució equitativa quan el hashrate no s'ha reportat encara",
+        "Fix: saldo al header usa totalMiningReward (inclou share del pool)"
+      ],
+      "es": [
+        "Mining Pools: los alumnos pueden crear y unirse a pools de minería",
+        "Recompensa repartida proporcionalmente al hashrate aportado por cada miembro del pool",
+        "El profesor activa/desactiva pools y ve resumen con hashrate combinado y % red",
+        "Badge de color en el ranking de mineros para identificar miembros de cada pool",
+        "Layout profesor reorganizado: pools + historial (izquierda) | dificultad (derecha)",
+        "Fix: sincronización de activeRigs al servidor (hashrate del pool ya no muestra 0)",
+        "Fix: distribución equitativa cuando el hashrate no se ha reportado aún",
+        "Fix: saldo en el header usa totalMiningReward (incluye share del pool)"
+      ],
+      "en": [
+        "Mining Pools: students can create and join mining pools",
+        "Reward split proportionally to hashrate contributed by each pool member",
+        "Teacher enables/disables pools and sees summary with combined hashrate and network %",
+        "Color badge on miner ranking to identify pool members",
+        "Teacher layout reorganized: pools + history (left) | difficulty (right)",
+        "Fix: activeRigs sync to server (pool hashrate no longer shows 0)",
+        "Fix: equal distribution when hashrate has not been reported yet",
+        "Fix: header balance uses totalMiningReward (includes pool share)"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.7",
+    "date": "2026-03-12",
+    "changes": {
+      "ca": [
+        "Fase 7: Ajust de la Dificultat — auto-mining i dificultat granular",
+        "Màquines de minatge automàtic (1-3 rigs per alumne, velocitats 4/8/20 h/s)",
+        "Hashing client-side amb SHA-256 (Web Crypto API) sense saturar el servidor",
+        "Dificultat target-based: hash hex inferior a un objectiu (ex: 00F2) en lloc de zeros inicials",
+        "Ajust automàtic de dificultat ratio-based cada N blocs, com a Bitcoin real",
+        "Controls per alumne: el professor pot desbloquejar rigs i millores individualment",
+        "Dashboard docent: historial de períodes + estadístiques 2×2 + selector temps objectiu 15s/30s",
+        "Comptador en temps real del temps des de l'últim bloc minat",
+        "Dificultat estimada del pròxim període visible a professor i alumne",
+        "Interfície alumne: panells \"Ajust de dificultat\" i \"Estat del node\" costat a costat",
+        "Instruccions de fase amb preguntes d'experimentació per als alumnes",
+        "Recompensa fixa a 50 BTC (halving reservat per a la Fase 8)",
+        "Fix hashrate total de la xarxa (ara reflecteix correctament miners actius)"
+      ],
+      "es": [
+        "Fase 7: Ajuste de la Dificultad — auto-mining y dificultad granular",
+        "Máquinas de minado automático (1-3 rigs por alumno, velocidades 4/8/20 h/s)",
+        "Hashing client-side con SHA-256 (Web Crypto API) sin saturar el servidor",
+        "Dificultad target-based: hash hex inferior a un objetivo (ej: 00F2) en lugar de ceros iniciales",
+        "Ajuste automático de dificultad ratio-based cada N bloques, como Bitcoin real",
+        "Controles por alumno: el profesor puede desbloquear rigs y mejoras individualmente",
+        "Dashboard docente: historial de períodos + estadísticas 2×2 + selector tiempo objetivo 15s/30s",
+        "Contador en tiempo real del tiempo desde el último bloque minado",
+        "Dificultad estimada del próximo período visible para profesor y alumno",
+        "Interfaz alumno: paneles \"Ajuste de dificultad\" y \"Estado del nodo\" lado a lado",
+        "Instrucciones de fase con preguntas de experimentación para los alumnos",
+        "Recompensa fija en 50 BTC (halving reservado para la Fase 8)",
+        "Fix hashrate total de la red (ahora refleja correctamente mineros activos)"
+      ],
+      "en": [
+        "Phase 7: Difficulty Adjustment — auto-mining and granular difficulty",
+        "Automatic mining machines (1-3 rigs per student, speeds 4/8/20 h/s)",
+        "Client-side SHA-256 hashing (Web Crypto API) without overloading the server",
+        "Target-based difficulty: hex hash below a target (e.g., 00F2) instead of leading zeros",
+        "Ratio-based automatic difficulty adjustment every N blocks, like real Bitcoin",
+        "Per-student controls: teacher can unlock rigs and upgrades individually",
+        "Teacher dashboard: period history + 2×2 stats + target time selector 15s/30s",
+        "Real-time counter of time since last mined block",
+        "Estimated next period difficulty visible to teacher and student",
+        "Student interface: \"Difficulty Adjustment\" and \"Node Status\" panels side by side",
+        "Phase instructions with experimentation questions for students",
+        "Fixed reward at 50 BTC (halving reserved for Phase 8)",
+        "Fix total network hashrate (now correctly reflects active miners)"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.6",
+    "date": "2026-03-12",
+    "changes": {
+      "ca": [
+        "Fase 5 completa: Xarxa de nodes amb visualització interactiva i mempool",
+        "Topologia de xarxa amb drag & drop de nodes i connexions animades",
+        "Propagació de transaccions en temps real amb polsos visuals entre nodes",
+        "Radar de nodes orfes (desconnectats) amb reconnexió automàtica",
+        "Desconnexió selectiva de nodes pel professor per demostrar particions de xarxa",
+        "Panells de comparació de mempools al dashboard docent",
+        "Fase 6: Proof of Work — Mineria i Blockchain",
+        "Panell educatiu interactiu amb 4 seccions: mempool, hash explorer, mining amb nonce, cadena de blocs",
+        "Hash explorer: entrada de text amb SHA-256 en temps real (Web Crypto API)",
+        "Mining explorer: cerca de nonce amb dificultat configurable i zeros inicials",
+        "Blockchain explorer: 3 blocs encadenats, editar un bloc invalida la cadena",
+        "Bloc gènesi creat pel professor amb dificultat auto-calculada segons alumnes",
+        "Cada alumne mina independentment: botó \"Començar a minar\", nonce, hash, anunciar bloc",
+        "Visor de blockchain compartit (professor i alumne) amb blocs minats i bloc pendent animat",
+        "Dashboard docent: visor blockchain amb botó gènesi, estadístiques de xarxa i rànking de miners",
+        "Panell \"Estat del node\" per alumne: blocs minats, saldo BTC, intents de hash",
+        "Botó \"Reiniciar fase\" del header ara també neteja blocs i stats de mineria (fase 6+)",
+        "i18n complet (CA/ES/EN) per tots els panells educatius i interfícies de mineria"
+      ],
+      "es": [
+        "Fase 5 completa: Red de nodos con visualización interactiva y mempool",
+        "Topología de red con drag & drop de nodos y conexiones animadas",
+        "Propagación de transacciones en tiempo real con pulsos visuales entre nodos",
+        "Radar de nodos huérfanos (desconectados) con reconexión automática",
+        "Desconexión selectiva de nodos por el profesor para demostrar particiones de red",
+        "Paneles de comparación de mempools en el dashboard docente",
+        "Fase 6: Proof of Work — Minería y Blockchain",
+        "Panel educativo interactivo con 4 secciones: mempool, hash explorer, mining con nonce, cadena de bloques",
+        "Hash explorer: entrada de texto con SHA-256 en tiempo real (Web Crypto API)",
+        "Mining explorer: búsqueda de nonce con dificultad configurable y ceros iniciales",
+        "Blockchain explorer: 3 bloques encadenados, editar un bloque invalida la cadena",
+        "Bloque génesis creado por el profesor con dificultad auto-calculada según alumnos",
+        "Cada alumno mina independientemente: botón \"Empezar a minar\", nonce, hash, anunciar bloque",
+        "Visor de blockchain compartido (profesor y alumno) con bloques minados y bloque pendiente animado",
+        "Dashboard docente: visor blockchain con botón génesis, estadísticas de red y ranking de mineros",
+        "Panel \"Estado del nodo\" por alumno: bloques minados, saldo BTC, intentos de hash",
+        "Botón \"Reiniciar fase\" del header ahora también limpia bloques y stats de minería (fase 6+)",
+        "i18n completo (CA/ES/EN) para todos los paneles educativos e interfaces de minería"
+      ],
+      "en": [
+        "Phase 5 complete: Node network with interactive visualization and mempool",
+        "Network topology with drag & drop nodes and animated connections",
+        "Real-time transaction propagation with visual pulses between nodes",
+        "Orphan node radar (disconnected) with automatic reconnection",
+        "Selective node disconnection by teacher to demonstrate network partitions",
+        "Mempool comparison panels on teacher dashboard",
+        "Phase 6: Proof of Work — Mining and Blockchain",
+        "Interactive educational panel with 4 sections: mempool, hash explorer, mining with nonce, blockchain",
+        "Hash explorer: text input with real-time SHA-256 (Web Crypto API)",
+        "Mining explorer: nonce search with configurable difficulty and leading zeros",
+        "Blockchain explorer: 3 linked blocks, editing a block invalidates the chain",
+        "Genesis block created by teacher with auto-calculated difficulty based on students",
+        "Each student mines independently: \"Start mining\" button, nonce, hash, announce block",
+        "Shared blockchain viewer (teacher and student) with mined blocks and animated pending block",
+        "Teacher dashboard: blockchain viewer with genesis button, network stats and miner ranking",
+        "\"Node status\" panel per student: blocks mined, BTC balance, hash attempts",
+        "\"Reset phase\" header button now also clears blocks and mining stats (phase 6+)",
+        "Full i18n (CA/ES/EN) for all educational panels and mining interfaces"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.5",
+    "date": "2026-03-09",
+    "changes": {
+      "ca": [
+        "Fase 4 completa: Model UTXO amb validació local de transaccions",
+        "El professor controla l'emissió de monedes: botons toggle per seleccionar alumnes i enviar BTC",
+        "Eliminat botó \"Inicialitzar UTXOs\" de l'alumne — el professor envia monedes directament",
+        "Validació local de TX: cada alumne valida transaccions individualment, creant registres potencialment incoherents",
+        "Panell \"Transaccions pendents de validar\" amb botó Validar per cada TX",
+        "Panell \"Transaccions verificades\" amb numeració d'ordre local (#1, #2...) i border verd",
+        "Persistència de validacions en localStorage per cada participant",
+        "Layout alumne reorganitzat: 2 columnes (cartera + constructor | pendents + verificades)",
+        "Layout professor reorganitzat: 2 columnes (enviar BTC + pendents | verificades)",
+        "Colors neutres al dashboard del professor (eliminat accent taronja)",
+        "Eliminats quadres d'estadístiques redundants del dashboard professor"
+      ],
+      "es": [
+        "Fase 4 completa: Modelo UTXO con validación local de transacciones",
+        "El profesor controla la emisión de monedas: botones toggle para seleccionar alumnos y enviar BTC",
+        "Eliminado botón \"Inicializar UTXOs\" del alumno — el profesor envía monedas directamente",
+        "Validación local de TX: cada alumno valida transacciones individualmente, creando registros potencialmente incoherentes",
+        "Panel \"Transacciones pendientes de validar\" con botón Validar por cada TX",
+        "Panel \"Transacciones verificadas\" con numeración de orden local (#1, #2...) y borde verde",
+        "Persistencia de validaciones en localStorage por cada participante",
+        "Layout alumno reorganizado: 2 columnas (cartera + constructor | pendientes + verificadas)",
+        "Layout profesor reorganizado: 2 columnas (enviar BTC + pendientes | verificadas)",
+        "Colores neutros en el dashboard del profesor (eliminado acento naranja)",
+        "Eliminados cuadros de estadísticas redundantes del dashboard profesor"
+      ],
+      "en": [
+        "Phase 4 complete: UTXO model with local transaction validation",
+        "Teacher controls coin emission: toggle buttons to select students and send BTC",
+        "Removed \"Initialize UTXOs\" button from student — teacher sends coins directly",
+        "Local TX validation: each student validates transactions individually, creating potentially inconsistent records",
+        "Pending transactions panel with Validate button per TX",
+        "Verified transactions panel with local order numbering (#1, #2...) and green border",
+        "Validation persistence in localStorage per participant",
+        "Student layout reorganized: 2 columns (wallet + builder | pending + verified)",
+        "Teacher layout reorganized: 2 columns (send BTC + pending | verified)",
+        "Neutral colors on teacher dashboard (removed orange accent)",
+        "Removed redundant statistics boxes from teacher dashboard"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.4",
+    "date": "2026-03-09",
+    "changes": {
+      "ca": [
+        "Reestructuració UX completa de Fase 3: interfícies professor i alumne redissenyades",
+        "Colors neutres (eliminat tema lila) i layout compacte per a totes les zones",
+        "Helper pas a pas: generació de parells de claus RSA amb explicació de cada operació",
+        "Helper pas a pas: procés de hash d'un missatge (estat inicial, XOR per caràcter, resultat)",
+        "Helper pas a pas: signatura digital (hash → mod n → exponenciació amb clau privada)",
+        "Helper pas a pas: verificació de signatures (exponenciació amb clau pública → comparació de hash)",
+        "Tooltips d'ajuda contextuals als passos de hash, signatura i verificació",
+        "Nom del participant visible a la capçalera del perfil",
+        "Monitor de servidor desactivat per evitar congelades"
+      ],
+      "es": [
+        "Reestructuración UX completa de Fase 3: interfaces profesor y alumno rediseñadas",
+        "Colores neutros (eliminado tema lila) y layout compacto para todas las zonas",
+        "Helper paso a paso: generación de pares de claves RSA con explicación de cada operación",
+        "Helper paso a paso: proceso de hash de un mensaje (estado inicial, XOR por carácter, resultado)",
+        "Helper paso a paso: firma digital (hash → mod n → exponenciación con clave privada)",
+        "Helper paso a paso: verificación de firmas (exponenciación con clave pública → comparación de hash)",
+        "Tooltips de ayuda contextuales en los pasos de hash, firma y verificación",
+        "Nombre del participante visible en la cabecera del perfil",
+        "Monitor de servidor desactivado para evitar congelaciones"
+      ],
+      "en": [
+        "Full UX restructure of Phase 3: teacher and student interfaces redesigned",
+        "Neutral colors (removed purple theme) and compact layout for all zones",
+        "Step-by-step helper: RSA key pair generation with explanation of each operation",
+        "Step-by-step helper: message hashing process (initial state, XOR per character, result)",
+        "Step-by-step helper: digital signature (hash → mod n → exponentiation with private key)",
+        "Step-by-step helper: signature verification (exponentiation with public key → hash comparison)",
+        "Contextual help tooltips on hash, signature and verification steps",
+        "Participant name visible in profile header",
+        "Server monitor disabled to prevent freezes"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.3",
+    "date": "2026-03-08",
+    "changes": {
+      "ca": [
+        "Fase 3 (WIP): Signatures digitals i criptografia de clau pública",
+        "Motor criptogràfic educatiu: miniHash 24-bit + RSA amb primers petits",
+        "Panell criptogràfic interactiu per entendre hash, claus i signatures",
+        "Generació de claus RSA educatives (primers petits per transparència)",
+        "Signatura i verificació de missatges amb visualització pas a pas",
+        "Canal públic de missatges signats amb verificació inline",
+        "Missatges falsos del professor per demostrar la importància de les signatures",
+        "Arquitectura de fases documentada (PHASE-ARCHITECTURE.md)"
+      ],
+      "es": [
+        "Fase 3 (WIP): Firmas digitales y criptografía de clave pública",
+        "Motor criptográfico educativo: miniHash 24-bit + RSA con primos pequeños",
+        "Panel criptográfico interactivo para entender hash, claves y firmas",
+        "Generación de claves RSA educativas (primos pequeños para transparencia)",
+        "Firma y verificación de mensajes con visualización paso a paso",
+        "Canal público de mensajes firmados con verificación inline",
+        "Mensajes falsos del profesor para demostrar la importancia de las firmas",
+        "Arquitectura de fases documentada (PHASE-ARCHITECTURE.md)"
+      ],
+      "en": [
+        "Phase 3 (WIP): Digital signatures and public key cryptography",
+        "Educational crypto engine: miniHash 24-bit + RSA with small primes",
+        "Interactive crypto panel to understand hashing, keys and signatures",
+        "Educational RSA key generation (small primes for transparency)",
+        "Message signing and verification with step-by-step visualization",
+        "Public signed message channel with inline verification",
+        "Teacher fake messages to demonstrate the importance of signatures",
+        "Phase architecture documented (PHASE-ARCHITECTURE.md)"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.2",
+    "date": "2026-03-08",
+    "changes": {
+      "ca": [
+        "Professor com a participant actiu a Fase 2: pot proposar transaccions (legítimes i fraudulentes)",
+        "Dashboard professor reestructurat: 4 panells idèntics a la interfície alumne (2 columnes 60/40)",
+        "Select de remitent inclou TOTS els participants per demostrar suplantació d'identitat",
+        "Avís visual quan el professor proposa en nom d'un altre (identitat falsa)",
+        "Botons de vot normal + forçar acceptació/rebuig al panell de votacions pendents",
+        "Alumnes veuen l'admin als selectors de remitent/destinatari",
+        "Corregit: TX de l'admin ja no s'auto-aproven (majoria compta tots els participants)",
+        "Botó de reflexió (?) mogut a \"Votacions pendents\" (era a \"Transaccions acceptades\")",
+        "Eliminats panells redundants \"Activitat dels estudiants\" i \"Registre de transaccions\"",
+        "Layout 60/40 a les dues interfícies (professor i alumne) per optimitzar espai"
+      ],
+      "es": [
+        "Profesor como participante activo en Fase 2: puede proponer transacciones (legítimas y fraudulentas)",
+        "Dashboard profesor reestructurado: 4 paneles idénticos a la interfaz alumno (2 columnas 60/40)",
+        "Select de remitente incluye TODOS los participantes para demostrar suplantación de identidad",
+        "Aviso visual cuando el profesor propone en nombre de otro (identidad falsa)",
+        "Botones de voto normal + forzar aceptación/rechazo en el panel de votaciones pendientes",
+        "Alumnos ven al admin en los selectores de remitente/destinatario",
+        "Corregido: TX del admin ya no se auto-aprueban (mayoría cuenta todos los participantes)",
+        "Botón de reflexión (?) movido a \"Votaciones pendientes\" (era en \"Transacciones aceptadas\")",
+        "Eliminados paneles redundantes \"Actividad de los estudiantes\" y \"Registro de transacciones\"",
+        "Layout 60/40 en ambas interfaces (profesor y alumno) para optimizar espacio"
+      ],
+      "en": [
+        "Teacher as active participant in Phase 2: can propose transactions (legitimate and fraudulent)",
+        "Teacher dashboard restructured: 4 panels identical to student interface (2-column 60/40)",
+        "Sender select includes ALL participants to demonstrate identity spoofing",
+        "Visual warning when teacher proposes on behalf of another (false identity)",
+        "Normal vote buttons + force accept/reject in pending votations panel",
+        "Students can see the admin in sender/receiver selectors",
+        "Fixed: admin TX no longer auto-approved (majority counts all participants)",
+        "Reflection button (?) moved to \"Pending votations\" (was in \"Accepted transactions\")",
+        "Removed redundant \"Student activity\" and \"Transaction registry\" panels",
+        "60/40 layout on both interfaces (teacher and student) to optimize space"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.1",
+    "date": "2026-03-08",
+    "changes": {
+      "ca": [
+        "Fase 1 polida i llesta per producció",
+        "Reset automàtic de transaccions i saldos en entrar a Fase 1",
+        "Saldos editables pel professor a la taula \"Comptes del banc\"",
+        "Panell del banc compactat en 1 fila: botó + límit lliure numèric",
+        "Detecció de \"Saldo insuficient\" corregida (només compta transaccions aprovades)",
+        "Badge \"Saldo insuficient\" al registre de transaccions aprovades sospitoses",
+        "Interfície alumne reestructurada: layout 2 columnes (era 3)",
+        "Formulari de transferència compacte en 1 fila: selector + import + botó",
+        "Transaccions estil bancari: vermell (enviat), verd (rebut), taronja (pendent), gris (rebutjada)",
+        "Eliminat panell d'instruccions redundant a la interfície alumne",
+        "Polling reduït de 5s a 2s per actualitzacions més ràpides"
+      ],
+      "es": [
+        "Fase 1 pulida y lista para producción",
+        "Reset automático de transacciones y saldos al entrar en Fase 1",
+        "Saldos editables por el profesor en la tabla \"Cuentas del banco\"",
+        "Panel del banco compactado en 1 fila: botón + límite libre numérico",
+        "Detección de \"Saldo insuficiente\" corregida (solo cuenta transacciones aprobadas)",
+        "Badge \"Saldo insuficiente\" en el registro de transacciones aprobadas sospechosas",
+        "Interfaz alumno reestructurada: layout 2 columnas (era 3)",
+        "Formulario de transferencia compacto en 1 fila: selector + importe + botón",
+        "Transacciones estilo bancario: rojo (enviado), verde (recibido), naranja (pendiente), gris (rechazada)",
+        "Eliminado panel de instrucciones redundante en la interfaz alumno",
+        "Polling reducido de 5s a 2s para actualizaciones más rápidas"
+      ],
+      "en": [
+        "Phase 1 polished and production-ready",
+        "Auto-reset transactions and balances when entering Phase 1",
+        "Editable balances for teacher in \"Bank accounts\" table",
+        "Bank panel compacted to 1 row: button + numeric free limit",
+        "Fixed \"Insufficient balance\" detection (only counts approved transactions)",
+        "\"Insufficient balance\" badge on suspicious approved transactions",
+        "Student interface restructured: 2-column layout (was 3)",
+        "Compact transfer form in 1 row: selector + amount + button",
+        "Bank-style transactions: red (sent), green (received), orange (pending), grey (rejected)",
+        "Removed redundant instructions panel from student interface",
+        "Polling reduced from 5s to 2s for faster updates"
+      ]
+    }
+  },
+  {
+    "version": "v0.4.0",
+    "date": "2026-03-07",
+    "changes": {
+      "ca": [
+        "Fase 0 completament jugable i llesta per producció",
+        "Mode fosc complet amb paleta zinc i accents amber",
+        "Header compacte: controls docent, saldo alumne, instruccions per rol",
+        "Dashboard docent: 2 columnes, indicador groc de sobrecost, dark mode",
+        "Interfície alumne: layout 2 columnes, editor click-to-edit, auto-save",
+        "Instruccions separades: panell lateral (docent) i dropdown (alumne)",
+        "Navegació de fases compacta amb accions directes",
+        "Selector d'idioma només icona, barres d'scroll ocultes",
+        "Icona de moneda Font Awesome (fa-cent-sign)"
+      ],
+      "es": [
+        "Fase 0 completamente jugable y lista para producción",
+        "Modo oscuro completo con paleta zinc y acentos amber",
+        "Header compacto: controles docente, saldo alumno, instrucciones por rol",
+        "Dashboard docente: 2 columnas, indicador amarillo de sobregasto, dark mode",
+        "Interfaz alumno: layout 2 columnas, editor click-to-edit, auto-save",
+        "Instrucciones separadas: panel lateral (docente) y dropdown (alumno)",
+        "Navegación de fases compacta con acciones directas",
+        "Selector de idioma solo icono, barras de scroll ocultas",
+        "Icono de moneda Font Awesome (fa-cent-sign)"
+      ],
+      "en": [
+        "Phase 0 fully playable and production-ready",
+        "Full dark mode with zinc palette and amber accents",
+        "Compact header: teacher controls, student balance, role-aware instructions",
+        "Teacher dashboard: 2-column layout, yellow overspend indicator, dark mode",
+        "Student interface: 2-column layout, click-to-edit editor, auto-save",
+        "Separate instructions: side panel (teacher) and dropdown (student)",
+        "Compact phase navigation with direct actions",
+        "Icon-only language selector, hidden scrollbars",
+        "Font Awesome coin icon (fa-cent-sign)"
+      ]
+    }
+  },
+  {
+    "version": "v0.3.0",
+    "date": "2026-03-07",
+    "changes": {
+      "ca": [
+        "Comunicació en temps real amb Socket.io (substitueix HTTP polling)",
+        "Servidor custom amb Next.js + Socket.io integrats",
+        "Actualitzacions instantànies entre professor i alumnes"
+      ],
+      "es": [
+        "Comunicación en tiempo real con Socket.io (sustituye HTTP polling)",
+        "Servidor custom con Next.js + Socket.io integrados",
+        "Actualizaciones instantáneas entre profesor y alumnos"
+      ],
+      "en": [
+        "Real-time communication with Socket.io (replaces HTTP polling)",
+        "Custom server with Next.js + Socket.io integrated",
+        "Instant updates between teacher and students"
+      ]
+    }
+  },
+  {
+    "version": "v0.2.0",
+    "date": "2026-03-07",
+    "changes": {
+      "ca": [
+        "Migració a in-memory store (eliminat PostgreSQL/Prisma)",
+        "Neteja de 39 dependències no usades",
+        "Totes les dades són efímeres per sessió educativa"
+      ],
+      "es": [
+        "Migración a in-memory store (eliminado PostgreSQL/Prisma)",
+        "Limpieza de 39 dependencias no usadas",
+        "Todos los datos son efímeros por sesión educativa"
+      ],
+      "en": [
+        "Migration to in-memory store (removed PostgreSQL/Prisma)",
+        "Cleanup of 39 unused dependencies",
+        "All data is ephemeral per educational session"
+      ]
+    }
+  },
+  {
+    "version": "v0.1.0",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 9: Simulació Lliure i Reptes Finals",
+        "Els estudiants poden experimentar amb tots els elements de Bitcoin",
+        "Rols: Usuari, Miner o Ambdós amb 100 BTC inicials",
+        "Repte 1: Atac del 51% - intentar revertir transaccions",
+        "Repte 2: Congestió Extrema - observar el mercat de comissions",
+        "Repte 3: Fork - veure com es resolen cadenes competidores",
+        "Repte 4: Economia Sostenible - analitzar si les comissions poden mantenir la seguretat",
+        "Repte 5: Impacte Ambiental - calcular energia gastada en mineria",
+        "Estadístiques globals en temps real per al professor",
+        "Registre d'activitat i rànquing de riquesa"
+      ],
+      "es": [
+        "Nueva Fase 9: Simulación Libre y Desafíos Finales",
+        "Los estudiantes pueden experimentar con todos los elementos de Bitcoin",
+        "Roles: Usuario, Minero o Ambos con 100 BTC iniciales",
+        "Desafío 1: Ataque del 51% - intentar revertir transacciones",
+        "Desafío 2: Congestión Extrema - observar el mercado de comisiones",
+        "Desafío 3: Fork - ver cómo se resuelven cadenas competidoras",
+        "Desafío 4: Economía Sostenible - analizar si las comisiones pueden mantener la seguridad",
+        "Desafío 5: Impacto Ambiental - calcular energía gastada en minería",
+        "Estadísticas globales en tiempo real para el profesor",
+        "Registro de actividad y ranking de riqueza"
+      ],
+      "en": [
+        "New Phase 9: Free Simulation & Final Challenges",
+        "Students can experiment with all Bitcoin elements",
+        "Roles: User, Miner or Both with 100 BTC initial balance",
+        "Challenge 1: 51% Attack - attempt to reverse transactions",
+        "Challenge 2: Extreme Congestion - observe fee market",
+        "Challenge 3: Fork - see how competing chains are resolved",
+        "Challenge 4: Sustainable Economy - analyze if fees can maintain security",
+        "Challenge 5: Environmental Impact - calculate energy spent mining",
+        "Real-time global statistics for teacher",
+        "Activity log and wealth ranking"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.9.1",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Correccions menors d'interfície",
+        "Canvi de codi d'idioma: AD → CA per al català",
+        "Panell del Banc ara només visible a la Fase 1",
+        "Actualització de l'historial de canvis"
+      ],
+      "es": [
+        "Correcciones menores de interfaz",
+        "Cambio de código de idioma: AD → CA para catalán",
+        "Panel del Banco ahora solo visible en la Fase 1",
+        "Actualización del historial de cambios"
+      ],
+      "en": [
+        "Minor interface fixes",
+        "Language code change: AD → CA for Catalan",
+        "Bank Panel now only visible in Phase 1",
+        "Changelog update"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.9",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 8: Halving i Economia de Bitcoin",
+        "Recompensa inicial de 50 BTC per bloc",
+        "Halving cada 10 blocs (simulat)",
+        "Visualització de la corba d'emissió de Bitcoin",
+        "Gràfic de recompenses acumulades vs comissions",
+        "Estadístiques econòmiques: BTC en circulació, recompensa actual",
+        "Demo: accelerar halvings per veure l'impacte",
+        "Pregunta clau: Què passarà quan les recompenses siguin zero?"
+      ],
+      "es": [
+        "Nueva Fase 8: Halving y Economía de Bitcoin",
+        "Recompensa inicial de 50 BTC por bloque",
+        "Halving cada 10 bloques (simulado)",
+        "Visualización de la curva de emisión de Bitcoin",
+        "Gráfico de recompensas acumuladas vs comisiones",
+        "Estadísticas económicas: BTC en circulación, recompensa actual",
+        "Demo: acelerar halvings para ver el impacto",
+        "Pregunta clave: ¿Qué pasará cuando las recompensas sean cero?"
+      ],
+      "en": [
+        "New Phase 8: Halving and Bitcoin Economics",
+        "Initial reward of 50 BTC per block",
+        "Halving every 10 blocks (simulated)",
+        "Bitcoin emission curve visualization",
+        "Cumulative rewards vs fees chart",
+        "Economic statistics: BTC in circulation, current reward",
+        "Demo: accelerate halvings to see impact",
+        "Key question: What will happen when rewards reach zero?"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.8",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 7: Ajust de Dificultat",
+        "La dificultat s'ajusta cada 10 blocs (configurable)",
+        "Temps objectiu per bloc: 30 segons (configurable)",
+        "Visualització del període actual i estadístiques",
+        "Gràfic d'historial de dificultats",
+        "Ajust automàtic: ↑ si massa ràpid, ↓ si massa lent",
+        "Informació detallada de cada període",
+        "Pregunta clau: Com mantenim un temps de bloc consistent?"
+      ],
+      "es": [
+        "Nueva Fase 7: Ajuste de Dificultad",
+        "La dificultad se ajusta cada 10 bloques (configurable)",
+        "Tiempo objetivo por bloque: 30 segundos (configurable)",
+        "Visualización del período actual y estadísticas",
+        "Gráfico de historial de dificultades",
+        "Ajuste automático: ↑ si muy rápido, ↓ si muy lento",
+        "Información detallada de cada período",
+        "Pregunta clave: ¿Cómo mantenemos un tiempo de bloque consistente?"
+      ],
+      "en": [
+        "New Phase 7: Difficulty Adjustment",
+        "Difficulty adjusts every 10 blocks (configurable)",
+        "Target block time: 30 seconds (configurable)",
+        "Current period visualization and statistics",
+        "Difficulty history chart",
+        "Automatic adjustment: ↑ if too fast, ↓ if too slow",
+        "Detailed period information",
+        "Key question: How do we maintain consistent block times?"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.7",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 6: Proof of Work (Mineria)",
+        "Els estudiants competeixen per trobar un NONCE vàlid",
+        "Cada clic incrementa el nonce i calcula un nou hash SHA-256",
+        "Objectiu: trobar un hash que comenci amb zeros (dificultat fixa: 2)",
+        "El primer que troba un hash vàlid guanya la recompensa (50 BTC)",
+        "Panell d'estat de xarxa: bloc actual, dificultat, miners actius",
+        "Zona de mineria: editar nonce, veure hash resultant",
+        "Zona d'enviament: anunciar bloc a la xarxa",
+        "Historial i rànquing: blocs minats, recompenses acumulades",
+        "Demo: intentar enviar blocs invàlids per veure el rebuig",
+        "Pregunta clau: Com evitem que algú inundi la xarxa amb blocs falsos?"
+      ],
+      "es": [
+        "Nueva Fase 6: Proof of Work (Minería)",
+        "Los estudiantes compiten para encontrar un NONCE válido",
+        "Cada clic incrementa el nonce y calcula un nuevo hash SHA-256",
+        "Objetivo: encontrar un hash que empiece con ceros (dificultad fija: 2)",
+        "El primero que encuentra un hash válido gana la recompensa (50 BTC)",
+        "Panel de estado de red: bloque actual, dificultad, mineros activos",
+        "Zona de minería: editar nonce, ver hash resultante",
+        "Zona de envío: anunciar bloque a la red",
+        "Historial y ranking: bloques minados, recompensas acumuladas",
+        "Demo: intentar enviar bloques inválidos para ver el rechazo",
+        "Pregunta clave: ¿Cómo evitamos que alguien inunde la red con bloques falsos?"
+      ],
+      "en": [
+        "New Phase 6: Proof of Work (Mining)",
+        "Students compete to find a valid NONCE",
+        "Each click increments the nonce and calculates a new SHA-256 hash",
+        "Goal: find a hash that starts with zeros (fixed difficulty: 2)",
+        "First one to find a valid hash wins the reward (50 BTC)",
+        "Network status panel: current block, difficulty, active miners",
+        "Mining zone: edit nonce, see resulting hash",
+        "Submit zone: announce block to the network",
+        "History and ranking: mined blocks, accumulated rewards",
+        "Demo: try to submit invalid blocks to see rejection",
+        "Key question: How do we prevent someone from flooding the network with fake blocks?"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.6",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 5: Xarxa de Nodes i Mempool",
+        "Cada estudiant representa un node de la xarxa Bitcoin",
+        "Visualització de la xarxa amb connexions entre nodes",
+        "Simulació de propagació de transaccions en temps real",
+        "Mempool local: transaccions rebudes pel teu node",
+        "Mempool global: totes les transaccions pendents de confirmació",
+        "Demo: desconnectar nodes per veure com afecta la propagació",
+        "Demo: omplir el mempool per introduir el concepte de prioritat",
+        "Introducció al concepte de comissions (fees)",
+        "Pregunta clau: Qui decideix quines transaccions es confirmen?"
+      ],
+      "es": [
+        "Nueva Fase 5: Red de Nodos y Mempool",
+        "Cada estudiante representa un nodo de la red Bitcoin",
+        "Visualización de la red con conexiones entre nodos",
+        "Simulación de propagación de transacciones en tiempo real",
+        "Mempool local: transacciones recibidas por tu nodo",
+        "Mempool global: todas las transacciones pendientes de confirmación",
+        "Demo: desconectar nodos para ver cómo afecta la propagación",
+        "Demo: llenar el mempool para introducir el concepto de prioridad",
+        "Introducción al concepto de comisiones (fees)",
+        "Pregunta clave: ¿Quién decide qué transacciones se confirman?"
+      ],
+      "en": [
+        "New Phase 5: Node Network and Mempool",
+        "Each student represents a node in the Bitcoin network",
+        "Network visualization with connections between nodes",
+        "Real-time transaction propagation simulation",
+        "Local mempool: transactions received by your node",
+        "Global mempool: all pending transactions awaiting confirmation",
+        "Demo: disconnect nodes to see how it affects propagation",
+        "Demo: fill the mempool to introduce the concept of priority",
+        "Introduction to the concept of fees",
+        "Key question: Who decides which transactions get confirmed?"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.5",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 4: Model UTXO (Unspent Transaction Outputs)",
+        "Cada moneda és una peça única amb identificador (UTXO#A1)",
+        "Cada estudiant comença amb 3 UTXOs (10, 5, 2 BTC)",
+        "Constructor de transaccions: selecciona inputs i defineix outputs",
+        "Sistema de canvi: retorna monedes sobrants a tu mateix",
+        "Validació: els outputs no poden superar els inputs",
+        "Prevenció del doble pagament: UTXOs gastats es marquen",
+        "Registre global de transaccions UTXO",
+        "Interfície de 3 zones: cartera, constructor, transaccions globals"
+      ],
+      "es": [
+        "Nueva Fase 4: Modelo UTXO (Unspent Transaction Outputs)",
+        "Cada moneda es una pieza única con identificador (UTXO#A1)",
+        "Cada estudiante empieza con 3 UTXOs (10, 5, 2 BTC)",
+        "Constructor de transacciones: selecciona inputs y define outputs",
+        "Sistema de cambio: devuelve monedas sobrantes a ti mismo",
+        "Validación: los outputs no pueden superar los inputs",
+        "Prevención del doble pago: UTXOs gastados se marcan",
+        "Registro global de transacciones UTXO",
+        "Interfaz de 3 zonas: cartera, constructor, transacciones globales"
+      ],
+      "en": [
+        "New Phase 4: UTXO Model (Unspent Transaction Outputs)",
+        "Each coin is a unique piece with identifier (UTXO#A1)",
+        "Each student starts with 3 UTXOs (10, 5, 2 BTC)",
+        "Transaction builder: select inputs and define outputs",
+        "Change system: return excess coins to yourself",
+        "Validation: outputs cannot exceed inputs",
+        "Double spend prevention: spent UTXOs are marked",
+        "Global UTXO transaction registry",
+        "3-zone interface: wallet, builder, global transactions"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.4",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 3: Criptografia de clau pública i signatures digitals",
+        "Generació de parells de claus (pública/privada) per a cada estudiant",
+        "Registre públic de claus visible per tothom",
+        "Sistema de signatura de missatges amb hash i clau privada",
+        "Verificació de signatures: detecta missatges falsos",
+        "Canal públic de missatges signats",
+        "Funcionalitat de \"missatge fals\" pel professor (demo)",
+        "Interfície de 4 zones: perfil, registre de claus, editor de missatges, canal públic"
+      ],
+      "es": [
+        "Nueva Fase 3: Criptografía de clave pública y firmas digitales",
+        "Generación de pares de claves (pública/privada) para cada estudiante",
+        "Registro público de claves visible para todos",
+        "Sistema de firma de mensajes con hash y clave privada",
+        "Verificación de firmas: detecta mensajes falsos",
+        "Canal público de mensajes firmados",
+        "Funcionalidad de \"mensaje falso\" para el profesor (demo)",
+        "Interfaz de 4 zonas: perfil, registro de claves, editor de mensajes, canal público"
+      ],
+      "en": [
+        "New Phase 3: Public key cryptography and digital signatures",
+        "Key pair generation (public/private) for each student",
+        "Public key registry visible to everyone",
+        "Message signing system with hash and private key",
+        "Signature verification: detects fake messages",
+        "Public channel for signed messages",
+        "\"Fake message\" functionality for teacher (demo)",
+        "4-zone interface: profile, key registry, message editor, public channel"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.3",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Nova Fase 2: Consens distribuït (el registre compartit)",
+        "Registre compartit visible per tots els participants",
+        "Sistema de propostes: qualsevol estudiant pot proposar transaccions",
+        "Votació democràtica: tots voten per acceptar o rebutjar",
+        "Consens per majoria: >50% dels vots decideix",
+        "Possibilitat de proposar transaccions en nom d'altres (per demostrar problemes d'autenticació)",
+        "Panel de control del professor amb forçar acceptació/rebuig",
+        "Estadístiques de participació en votacions"
+      ],
+      "es": [
+        "Nueva Fase 2: Consenso distribuido (el registro compartido)",
+        "Registro compartido visible para todos los participantes",
+        "Sistema de propuestas: cualquier estudiante puede proponer transacciones",
+        "Votación democrática: todos votan para aceptar o rechazar",
+        "Consenso por mayoría: >50% de los votos decide",
+        "Posibilidad de proponer transacciones en nombre de otros (para demostrar problemas de autenticación)",
+        "Panel de control del profesor con forzar aceptación/rechazo",
+        "Estadísticas de participación en votaciones"
+      ],
+      "en": [
+        "New Phase 2: Distributed consensus (shared ledger)",
+        "Shared ledger visible to all participants",
+        "Proposal system: any student can propose transactions",
+        "Democratic voting: everyone votes to accept or reject",
+        "Majority consensus: >50% of votes decides",
+        "Ability to propose transactions on behalf of others (to demonstrate authentication issues)",
+        "Teacher control panel with force accept/reject",
+        "Voting participation statistics"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.2",
+    "date": "2026-02-02",
+    "changes": {
+      "ca": [
+        "Simplificació de la Fase 1: el professor fa de Banc",
+        "Eliminat el rol de Banc per als estudiants",
+        "Límit de transferència de 5 monedes màxim",
+        "Missatge \"visita l'oficina\" per imports superiors",
+        "Instruccions específiques per cada fase al dashboard",
+        "Suport multiidioma: Català, Español, English",
+        "Selector d'idioma a tota l'aplicació"
+      ],
+      "es": [
+        "Simplificación de la Fase 1: el profesor hace de Banco",
+        "Eliminado el rol de Banco para los estudiantes",
+        "Límite de transferencia de 5 monedas máximo",
+        "Mensaje \"visita la oficina\" para importes superiores",
+        "Instrucciones específicas para cada fase en el dashboard",
+        "Soporte multiidioma: Català, Español, English",
+        "Selector de idioma en toda la aplicación"
+      ],
+      "en": [
+        "Phase 1 simplification: teacher acts as Bank",
+        "Removed Bank role for students",
+        "Maximum transfer limit of 5 coins",
+        "\"Visit office\" message for higher amounts",
+        "Phase-specific instructions in dashboard",
+        "Multi-language support: Català, Español, English",
+        "Language selector throughout the app"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.1.1",
+    "date": "2026-01-28",
+    "changes": {
+      "ca": [
+        "Implementació de la Fase 1: Solució centralitzada (el banc)",
+        "Sistema de sol·licituds de transaccions",
+        "Aprovació/rebuig de transaccions pel Banc",
+        "Funcionalitat de desconnectar el Banc (demo)",
+        "Millores al footer amb versió i changelog",
+        "Canvi de \"estudiants\" a \"peers\" a la interfície",
+        "Popup d'ajuda millorat a la landing page"
+      ],
+      "es": [
+        "Implementación de la Fase 1: Solución centralizada (el banco)",
+        "Sistema de solicitudes de transacciones",
+        "Aprobación/rechazo de transacciones por el Banco",
+        "Funcionalidad de desconectar el Banco (demo)",
+        "Mejoras en el footer con versión y changelog",
+        "Cambio de \"estudiantes\" a \"peers\" en la interfaz",
+        "Popup de ayuda mejorado en la landing page"
+      ],
+      "en": [
+        "Phase 1 implementation: Centralized solution (the bank)",
+        "Transaction request system",
+        "Bank transaction approval/rejection",
+        "Bank disconnection feature (demo)",
+        "Footer improvements with version and changelog",
+        "Changed \"students\" to \"peers\" in interface",
+        "Improved help popup on landing page"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.1-rc2",
+    "date": "2026-01-28",
+    "changes": {
+      "ca": [
+        "Detecció de transaccions sospitoses al registre",
+        "Comptador d'activitat sospitosa millorat",
+        "Indicador de \"Saldo insuficient\" a les transaccions"
+      ],
+      "es": [
+        "Detección de transacciones sospechosas en el registro",
+        "Contador de actividad sospechosa mejorado",
+        "Indicador de \"Saldo insuficiente\" en las transacciones"
+      ],
+      "en": [
+        "Suspicious transaction detection in registry",
+        "Improved suspicious activity counter",
+        "\"Insufficient balance\" indicator on transactions"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.1-rc1",
+    "date": "2026-01-28",
+    "changes": {
+      "ca": [
+        "Correcció del sistema de saldos en transaccions",
+        "Actualització automàtica de saldos (sender i receiver)",
+        "Suport per saldos negatius",
+        "Missatges de feedback millorats amb timeout"
+      ],
+      "es": [
+        "Corrección del sistema de saldos en transacciones",
+        "Actualización automática de saldos (sender y receiver)",
+        "Soporte para saldos negativos",
+        "Mensajes de feedback mejorados con timeout"
+      ],
+      "en": [
+        "Balance system fix in transactions",
+        "Automatic balance update (sender and receiver)",
+        "Negative balance support",
+        "Improved feedback messages with timeout"
+      ]
+    }
+  },
+  {
+    "version": "v0.0.1",
+    "date": "2026-01-28",
+    "changes": {
+      "ca": [
+        "Llançament inicial de BitQuest",
+        "Fase 0: El problema del doble pagament",
+        "Sistema de sales amb codis d'accés",
+        "Interfície d'estudiant amb editor de moneder",
+        "Dashboard del professor amb estadístiques"
+      ],
+      "es": [
+        "Lanzamiento inicial de BitQuest",
+        "Fase 0: El problema del doble gasto",
+        "Sistema de salas con códigos de acceso",
+        "Interfaz de estudiante con editor de monedero",
+        "Dashboard del profesor con estadísticas"
+      ],
+      "en": [
+        "Initial BitQuest release",
+        "Phase 0: The double spending problem",
+        "Room system with access codes",
+        "Student interface with wallet editor",
+        "Teacher dashboard with statistics"
+      ]
+    }
+  }
+]

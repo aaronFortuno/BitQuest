@@ -8,21 +8,13 @@ import {
   Eye, EyeOff, Lock, Unlock, Hash, Shield, Users, MessageSquare,
   ChevronDown, ChevronUp, Search, Copy, HelpCircle
 } from 'lucide-react';
-import { Room, Participant, SignedMessage } from '@/lib/types';
+import { Participant, SignedMessage } from '@/lib/types';
 import {
   miniHash, generateRSAKeyPair, rsaSign, rsaVerify, verifySignature,
   parsePublicKey, serializePublicKey,
   type HashStep, type KeyGenSteps, type RSAKeyPair, type SignSteps, type VerifySteps
 } from '@/lib/crypto';
-
-interface Phase3UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  messages: SignedMessage[];
-  onGenerateKeys: () => { publicKey: string; privateKey: RSAKeyPair['privateKey']; steps: KeyGenSteps } | null;
-  onBroadcastKey: (publicKey: string) => Promise<boolean>;
-  onSendMessage: (content: string, messageHash: string, signature: string) => Promise<void>;
-}
+import { useRoom } from '@/contexts/room-context';
 
 // Signature Anatomy Panel — shows hash, sign, verify steps
 function SignatureAnatomyPanel({
@@ -121,14 +113,16 @@ function SignatureAnatomyPanel({
   );
 }
 
-export default function Phase3UserInterface({
-  room,
-  participant,
-  messages,
-  onGenerateKeys,
-  onBroadcastKey,
-  onSendMessage,
-}: Phase3UserInterfaceProps) {
+export default function Phase3UserInterface() {
+  const {
+    room,
+    participant: nullableParticipant,
+    messages,
+    generateKeys,
+    broadcastPublicKey,
+    sendSignedMessage,
+  } = useRoom();
+  const participant = nullableParticipant as Participant;
   const { t } = useTranslation();
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [messageContent, setMessageContent] = useState('');
@@ -156,7 +150,7 @@ export default function Phase3UserInterface({
   const [previewSignature, setPreviewSignature] = useState<string | null>(null);
   const [signSteps, setSignSteps] = useState<SignSteps | null>(null);
 
-  const activeParticipants = room.participants.filter(p => p.isActive);
+  const activeParticipants = (room?.participants ?? []).filter(p => p.isActive);
 
   // Copy key feedback
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
@@ -202,7 +196,7 @@ export default function Phase3UserInterface({
   const handleGenerateKeys = () => {
     setIsGeneratingKeys(true);
     try {
-      const result = onGenerateKeys();
+      const result = generateKeys();
       if (result) {
         setKeyGenSteps(result.steps);
         setLocalPrivateKey(result.privateKey);
@@ -227,7 +221,7 @@ export default function Phase3UserInterface({
     setIsBroadcasting(true);
     try {
       const publicKeyStr = serializePublicKey(localPublicKey);
-      const success = await onBroadcastKey(publicKeyStr);
+      const success = await broadcastPublicKey(publicKeyStr);
       if (success) {
         setFeedback({ type: 'success', message: t('phase3.keyBroadcast') });
       } else {
@@ -261,7 +255,7 @@ export default function Phase3UserInterface({
       return;
     }
     try {
-      await onSendMessage(messageContent, previewHash, previewSignature);
+      await sendSignedMessage(messageContent, previewHash, previewSignature);
       setMessageContent('');
       setPreviewHash(null);
       setPreviewSignature(null);
@@ -616,7 +610,7 @@ export default function Phase3UserInterface({
             </div>
           ) : (
             messages.map(msg => {
-              const senderInfo = room.participants.find(p => p.id === msg.senderId);
+              const senderInfo = room?.participants.find(p => p.id === msg.senderId);
               const isFromMe = msg.senderId === participant.id;
               const isFake = msg.isFakeDemo;
               const verificationState = verifiedMap.get(msg.id);
@@ -779,7 +773,7 @@ export default function Phase3UserInterface({
                     <SignatureAnatomyPanel
                       message={anatomyMessage}
                       senderPublicKey={
-                        room.participants.find(p => p.id === anatomyMessage.senderId)?.publicKey || null
+                        room?.participants.find(p => p.id === anatomyMessage.senderId)?.publicKey || null
                       }
                       privateKey={
                         anatomyMessage.senderId === participant.id ? localPrivateKey : null

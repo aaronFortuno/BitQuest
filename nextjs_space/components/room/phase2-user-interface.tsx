@@ -7,21 +7,12 @@ import {
   User, CheckCircle, XCircle, Clock,
   Send, AlertCircle, HelpCircle
 } from 'lucide-react';
-import { Room, Participant, CoinFile } from '@/lib/types';
+import { CoinFile, Participant } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
-interface Phase2UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  onProposeTransaction: (senderId: string, receiverId: string, amount: number, proposedById: string) => Promise<void>;
-  onVote: (transactionId: string, vote: 'for' | 'against') => Promise<void>;
-}
-
-export default function Phase2UserInterface({
-  room,
-  participant,
-  onProposeTransaction,
-  onVote,
-}: Phase2UserInterfaceProps) {
+export default function Phase2UserInterface() {
+  const { room, participant: nullableParticipant, sendTransaction, voteOnTransaction } = useRoom();
+  const participant = nullableParticipant as Participant;
   const { t } = useTranslation();
   const [selectedSender, setSelectedSender] = useState<string>(participant.id);
   const [selectedReceiver, setSelectedReceiver] = useState<string>('');
@@ -30,14 +21,14 @@ export default function Phase2UserInterface({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReflection, setShowReflection] = useState(false);
 
-  const students = room.participants.filter(p => p.isActive);
+  const students = (room?.participants ?? []).filter(p => p.isActive);
   const otherUsers = students.filter(p => p.id !== selectedSender);
 
   // All voting proposals (multiple allowed)
-  const votingProposals = room.transactions.filter(tx => tx.status === 'voting');
-  const approvedTransactions = room.transactions.filter(tx => tx.status === 'approved')
+  const votingProposals = (room?.transactions ?? []).filter(tx => tx.status === 'voting');
+  const approvedTransactions = (room?.transactions ?? []).filter(tx => tx.status === 'approved')
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const rejectedTransactions = room.transactions.filter(tx => tx.status === 'rejected')
+  const rejectedTransactions = (room?.transactions ?? []).filter(tx => tx.status === 'rejected')
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const getBalance = (p: Participant): number => {
@@ -67,7 +58,7 @@ export default function Phase2UserInterface({
 
     setIsSubmitting(true);
     try {
-      await onProposeTransaction(selectedSender, selectedReceiver, amount, participant.id);
+      await sendTransaction(selectedReceiver, amount, 2, selectedSender, participant.id);
 
       if (selectedSender !== participant.id) {
         setFeedback({ type: 'warning', message: t('falseProposalWarning') });
@@ -87,7 +78,7 @@ export default function Phase2UserInterface({
 
   const handleVote = async (transactionId: string, vote: 'for' | 'against') => {
     try {
-      await onVote(transactionId, vote);
+      await voteOnTransaction(transactionId, vote);
       setFeedback({ type: 'success', message: t('voteCast') });
     } catch {
       setFeedback({ type: 'error', message: t('connectionError') });

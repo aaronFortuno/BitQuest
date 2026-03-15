@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Room, Transaction, Participant, SignedMessage, UTXO, UTXOTransaction, MempoolTransaction, NodeConnection, Block, DifficultyPeriod, HalvingInfo, EconomicStats, SimulationStats, ChallengeData, ChallengeType, MiningPool, BitcoinAddress, Phase9UTXO, Phase9MempoolTransaction } from '@/lib/types';
-// TEMPORARILY DISABLED — Socket.io long-polling exhausts browser connection pool
-// import { joinRoom as socketJoinRoom, leaveRoom as socketLeaveRoom, onRoomUpdate } from '@/lib/socket';
 import { apiUrl } from '@/lib/api';
 import { generateRSAKeyPair, serializePublicKey } from '@/lib/crypto';
 
@@ -72,7 +70,6 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
   const roomUuidRef = useRef<string | null>(null);
   // Guard against concurrent fetchRoom calls piling up
   const isFetchingRoom = useRef(false);
-  // Debounce timer for Socket.io-triggered fetches
   const debouncedFetchTimer = useRef<NodeJS.Timeout | null>(null);
 
   const fetchRoom = useCallback(async () => {
@@ -121,7 +118,6 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
 
     fetchRoom();
 
-    // Restart polling interval (called after Socket.io events to avoid overlap)
     const startPolling = () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
       pollInterval.current = setInterval(fetchRoom, 2000);
@@ -136,22 +132,6 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
-
-    // Socket.io: TEMPORARILY DISABLED
-    // Socket.io long-polling was exhausting the browser's connection pool (~6 conns/origin),
-    // causing ALL fetch requests to hang after ~60s. HTTP polling works fine alone.
-    // TODO: Re-enable once Socket.io is configured to use WebSocket-only transport.
-    // let socketCleanup: (() => void) | null = null;
-    // if (room?.code) {
-    //   socketJoinRoom(room.code);
-    //   socketCleanup = onRoomUpdate(() => {
-    //     if (debouncedFetchTimer.current) clearTimeout(debouncedFetchTimer.current);
-    //     debouncedFetchTimer.current = setTimeout(() => {
-    //       fetchRoom();
-    //       startPolling();
-    //     }, 300);
-    //   });
-    // }
 
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
@@ -935,7 +915,7 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
       fetchBlocks();
       fetchMempoolTransactions();
       if (room.currentPhase === 7) fetchPools();
-    }, 2000); // Uses base poll interval (Socket.io handles real-time)
+    }, 2000);
 
     return () => clearInterval(blocksPoll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1003,6 +983,11 @@ export function useRoomPolling({ roomId, participantId, enabled = true }: UseRoo
     code?: string;
     block?: Block;
     reward?: number;
+    difficultyAdjustment?: {
+      previousDifficulty: number;
+      newDifficulty: number;
+      result: 'increased' | 'decreased' | 'stable';
+    };
   }> => {
     if (!room || !participantId) {
       return { success: false, error: 'No room or participant' };

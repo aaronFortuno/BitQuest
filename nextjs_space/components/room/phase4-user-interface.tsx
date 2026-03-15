@@ -19,26 +19,21 @@ import {
   Undo2,
   ShieldCheck,
 } from 'lucide-react';
-import { Room, Participant, UTXO, UTXOTransaction, UTXOOutput } from '@/lib/types';
+import { UTXOOutput, UTXOTransaction } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
-interface Phase4UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  utxos: UTXO[];
-  utxoTransactions: UTXOTransaction[];
-  onSendTransaction: (
-    inputUtxoIds: string[],
-    outputs: { recipientId: string; amount: number }[]
-  ) => Promise<{ success: boolean; transaction?: UTXOTransaction; error?: string; invalidReason?: string }>;
-}
+export default function Phase4UserInterface() {
+  const {
+    room,
+    participant,
+    utxos,
+    utxoTransactions,
+    sendUtxoTransaction,
+  } = useRoom();
 
-export default function Phase4UserInterface({
-  room,
-  participant,
-  utxos,
-  utxoTransactions,
-  onSendTransaction,
-}: Phase4UserInterfaceProps) {
+  if (!room || !participant) return null;
+
+  const onSendTransaction = sendUtxoTransaction;
   const { t } = useTranslation();
   const [selectedUtxoIds, setSelectedUtxoIds] = useState<string[]>([]);
   const [outputs, setOutputs] = useState<{ recipientId: string; amount: number }[]>([{ recipientId: '', amount: 0 }]);

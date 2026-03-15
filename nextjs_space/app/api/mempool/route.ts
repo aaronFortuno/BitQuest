@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 import { monitor } from '@/lib/server-monitor';
 
 
@@ -103,8 +102,6 @@ export async function POST(request: NextRequest) {
       simulateGraphPropagation(mempoolTx.id, roomId, effectiveSenderId);
     }
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error creating mempool transaction:', error);
@@ -237,17 +234,12 @@ async function simulateGraphPropagation(txId: string, roomId: string, originNode
         propagationProgress: 100,
         propagatedTo: plan.allParticipantIds,
       });
-      const roomCode = store.getRoomCodeById(roomId);
-      if (roomCode) broadcastRoomUpdate(roomCode);
       return;
     }
 
     // Store the full propagation plan so the client can animate immediately
     const allEdges = plan.waves.flatMap(w => w.edges);
     store.updateMempoolTransaction(txId, { propagationEdges: allEdges });
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
-
     // Execute waves with real delays (for propagatedTo consistency)
     const propagatedSet = new Set<string>([originNodeId]);
     for (const wave of plan.waves) {
@@ -268,8 +260,6 @@ async function simulateGraphPropagation(txId: string, roomId: string, originNode
         propagationProgress: progress,
         status: progress >= 100 ? 'in_mempool' : 'propagating',
       });
-
-      if (roomCode) broadcastRoomUpdate(roomCode);
     }
 
     // Final: mark as in_mempool if still propagating
@@ -279,7 +269,6 @@ async function simulateGraphPropagation(txId: string, roomId: string, originNode
         status: 'in_mempool',
         propagationProgress: Math.round((propagatedSet.size / plan.totalNodes) * 100),
       });
-      if (roomCode) broadcastRoomUpdate(roomCode);
     }
   } catch (error) {
     console.error('Error during graph propagation:', error);

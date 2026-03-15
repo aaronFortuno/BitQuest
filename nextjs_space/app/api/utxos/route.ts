@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 // Generate a human-readable UTXO ID like UTXO#A1
@@ -64,8 +63,6 @@ export async function POST(request: NextRequest) {
         amount,
         isSpent: false,
       });
-      const roomCode = store.getRoomCodeById(roomId);
-      if (roomCode) broadcastRoomUpdate(roomCode);
       return NextResponse.json([{ ...utxo, owner: participant }]);
     }
 
@@ -90,8 +87,6 @@ export async function POST(request: NextRequest) {
       return { ...utxo, owner: participant };
     });
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json(utxos);
   } catch (error) {
     console.error('Error initializing UTXOs:', error);

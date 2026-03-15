@@ -12,17 +12,8 @@ import {
   Lock,
   Database,
 } from 'lucide-react';
-import { Room, Participant, MempoolTransaction, NodeConnection } from '@/lib/types';
-
-// ─── Types ───
-
-interface Phase5UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  mempoolTransactions: MempoolTransaction[];
-  nodeConnections: NodeConnection[];
-  onCreateTransaction: (receiverId: string, amount: number) => Promise<{ success: boolean; error?: string }>;
-}
+import { Participant, NodeConnection } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
 // ─── Constants ───
 const FLASH_DUR_S = 0.5;
@@ -165,13 +156,21 @@ function MiniNodeGraph({
 
 // ─── Main component ───
 
-export default function Phase5UserInterface({
-  room,
-  participant,
-  mempoolTransactions,
-  nodeConnections,
-  onCreateTransaction,
-}: Phase5UserInterfaceProps) {
+export default function Phase5UserInterface() {
+  const {
+    room,
+    participant,
+    mempoolTransactions,
+    nodeConnections,
+    createMempoolTransaction,
+  } = useRoom();
+
+  const onCreateTransaction = useCallback(
+    (receiverId: string, amount: number) => createMempoolTransaction(receiverId, amount, 0),
+    [createMempoolTransaction]
+  );
+
+  if (!room || !participant) return null;
   const { t } = useTranslation();
   const [selectedReceiver, setSelectedReceiver] = useState<string>('');
   const [amount, setAmount] = useState<string>('');

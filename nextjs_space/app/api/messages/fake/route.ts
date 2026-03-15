@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 import { miniHash } from '@/lib/crypto';
 
 // Generate a random fake signature (will fail verification)
@@ -38,8 +37,6 @@ export async function POST(request: NextRequest) {
       isFakeDemo: true,
     });
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json({
       ...message,
       sender: { id: teacher.id, name: teacher.name, publicKey: teacher.publicKey },

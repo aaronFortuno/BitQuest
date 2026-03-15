@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 // POST: Create a new signed message (hash and signature computed client-side)
 export async function POST(request: NextRequest) {
@@ -30,8 +29,6 @@ export async function POST(request: NextRequest) {
       claimedBy: sender.name,
     });
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json({
       ...message,
       sender: { id: sender.id, name: sender.name, publicKey: sender.publicKey },

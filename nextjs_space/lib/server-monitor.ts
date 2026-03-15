@@ -79,20 +79,9 @@ class ServerMonitor {
     this.lastSnapshotTime = now;
     this.lastSnapshotReqs = this.totalReqs;
 
-    // Get socket client count if available
-    let socketClients = '?';
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getIO } = require('./io');
-      const io = getIO();
-      if (io?.engine) {
-        socketClients = String(io.engine.clientsCount);
-      }
-    } catch { /* ignore */ }
-
     const uptime = Math.round((now - this.startTime) / 1000);
 
-    const line1 = `MONITOR | uptime: ${uptime}s | heap: ${heapMB}MB | rss: ${rssMB}MB | activeReqs: ${this.activeRequests} | socketClients: ${socketClients} | broadcasts: ${this.broadcastCount} | propagations: ${this.activePropagations} | reqRate: ${reqRate}/s`;
+    const line1 = `MONITOR | uptime: ${uptime}s | heap: ${heapMB}MB | rss: ${rssMB}MB | activeReqs: ${this.activeRequests} | propagations: ${this.activePropagations} | reqRate: ${reqRate}/s`;
 
     // Top routes by count
     const sorted = [...this.routeStats.entries()]

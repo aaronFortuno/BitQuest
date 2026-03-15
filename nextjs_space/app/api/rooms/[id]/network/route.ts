@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 // PATCH: Toggle Phase 5 network settings (studentSendingEnabled)
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -16,8 +15,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json({ room });
   } catch (error) {
     console.error('Error updating network settings:', error);

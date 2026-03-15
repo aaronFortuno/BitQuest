@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { apiUrl } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
-import { useRoomPolling } from '@/hooks/use-room-polling';
-import { Participant, Transaction } from '@/lib/types';
+import { Participant } from '@/lib/types';
+import { RoomProvider, useRoom } from '@/contexts/room-context';
 import Header from '@/components/room/header';
 import PhaseNavigation from '@/components/room/phase-navigation';
 import StudentInterface from '@/components/room/student-interface';
-import TeacherDashboard from '@/components/room/teacher-dashboard';
+import TeacherDashboard from '@/components/room/teacher';
 import InstructionsPanel from '@/components/room/instructions-panel';
 import StudentPhaseDropdown from '@/components/room/student-phase-dropdown';
 import Phase1UserInterface from '@/components/room/phase1-user-interface';
@@ -21,14 +21,12 @@ import Phase4UserInterface from '@/components/room/phase4-user-interface';
 import Phase5UserInterface from '@/components/room/phase5-user-interface';
 import { Phase6UserInterface } from '@/components/room/phase6-user-interface';
 import { Phase7UserInterface } from '@/components/room/phase7-user-interface';
-import { useAutoMining } from '@/hooks/use-auto-mining';
 import { Phase8UserInterface } from '@/components/room/phase8-user-interface';
 import Phase9UserInterface from '@/components/room/phase9-user-interface';
 import LoadingScreen from '@/components/ui/loading-screen';
 import VersionFooter from '@/components/ui/version-footer';
 
 export default function RoomPage() {
-  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
   const code = searchParams.get('code') || '';
@@ -39,11 +37,6 @@ export default function RoomPage() {
     role: 'teacher' | 'student';
   } | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [showNavigation, setShowNavigation] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
-  const [showStudentInstructions, setShowStudentInstructions] = useState(true);
-  const [studentViewPhase, setStudentViewPhase] = useState<number | null>(null);
-  const prevPhaseRef = useRef<number>(-1);
 
   useEffect(() => {
     setMounted(true);
@@ -68,16 +61,47 @@ export default function RoomPage() {
     }
   }, [code, router]);
 
+  if (!mounted || !participantData || !code) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <RoomProvider
+      roomCode={code}
+      participantId={participantData.id}
+      participantRole={participantData.role}
+    >
+      <RoomContent participantData={participantData} />
+    </RoomProvider>
+  );
+}
+
+function RoomContent({ participantData }: { participantData: { id: string; name: string; role: 'teacher' | 'student' } }) {
+  const { t } = useTranslation();
+  const router = useRouter();
+
   const {
     room,
+    loading,
+    error,
+    isTeacher,
+    participant: currentParticipant,
     messages,
     utxos,
     utxoTransactions,
-    // Phase 5
     mempoolTransactions,
     nodeConnections,
-    loading,
-    error,
+    blocks,
+    difficultyInfo,
+    halvingInfo,
+    economicStats,
+    miningPools,
+    poolsEnabled,
+    autoMineSettings,
+    simulationStats,
+    phase9Addresses,
+    phase9Utxos,
+    phase9MempoolTxs,
     sendTransaction,
     updateCoinFile,
     highlightTransaction,
@@ -95,7 +119,6 @@ export default function RoomPage() {
     initializeUtxos,
     teacherSendUtxo,
     sendUtxoTransaction,
-    // Phase 5
     initializeNetwork,
     createMempoolTransaction,
     toggleNodeDisconnection,
@@ -103,11 +126,6 @@ export default function RoomPage() {
     createTeacherTransaction,
     destroyConnection,
     toggleStudentSending,
-    // Phase 6, 7 & 8
-    blocks,
-    difficultyInfo,
-    halvingInfo,
-    economicStats,
     createPendingBlock,
     createGenesisBlock,
     calculateMiningHash,
@@ -119,26 +137,16 @@ export default function RoomPage() {
     updateRigSettings,
     batchHashUpdate,
     upgradeRig,
-    // Phase 7: Mining pools
-    miningPools,
-    poolsEnabled,
     createPool,
     joinPool,
     leavePool,
     deletePool,
     togglePools,
-    // Phase 8
     selectTransactionsForBlock,
     forceHalving,
     updateHalvingSettings,
     autoMineTick,
     updatePhase8Settings,
-    autoMineSettings,
-    // Phase 9
-    simulationStats,
-    phase9Addresses,
-    phase9Utxos,
-    phase9MempoolTxs,
     initPhase9,
     resetPhase9,
     fundAllPhase9Nodes,
@@ -147,12 +155,13 @@ export default function RoomPage() {
     autoMineTickPhase9,
     updatePhase9Settings,
     updateParticipantCoinFile,
-    refetch,
-  } = useRoomPolling({
-    roomId: code || null,
-    participantId: participantData?.id ?? null,
-    enabled: mounted && !!participantData && !!code,
-  });
+  } = useRoom();
+
+  const [showNavigation, setShowNavigation] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showStudentInstructions, setShowStudentInstructions] = useState(true);
+  const [studentViewPhase, setStudentViewPhase] = useState<number | null>(null);
+  const prevPhaseRef = useRef<number>(-1);
 
   // Auto-open student instructions when phase changes
   const roomPhase = room?.currentPhase ?? 0;
@@ -169,24 +178,8 @@ export default function RoomPage() {
     }
   }, [roomPhase]);
 
-  // Derive participant info (needed before early returns for hook call order)
-  const currentParticipant = room?.participants?.find(
-    (p: Participant) => p.id === participantData?.id
-  );
-  const isTeacher = participantData?.role === 'teacher';
   const currentPhase = room?.currentPhase ?? 0;
   const viewPhase = studentViewPhase ?? currentPhase;
-
-  // Phase 7: Auto-mining hook (must be called before any early returns)
-  const autoMining = useAutoMining({
-    room,
-    participant: currentParticipant,
-    blocks,
-    enabled: viewPhase === 7 && !isTeacher && !!currentParticipant && !!room,
-    onCreatePendingBlock: createPendingBlock,
-    onSubmitBlock: submitMinedBlock,
-    onBatchHashUpdate: batchHashUpdate,
-  });
 
   const handleLeaveRoom = async () => {
     if (participantData?.id) {
@@ -198,7 +191,7 @@ export default function RoomPage() {
     router.push('/');
   };
 
-  if (!mounted || loading) {
+  if (loading) {
     return <LoadingScreen />;
   }
 
@@ -230,35 +223,19 @@ export default function RoomPage() {
   const renderStudentInterface = () => {
     if (viewPhase === 0) {
       return (
-        <StudentInterface
-          room={room}
-          participant={currentParticipant ?? null}
-          onSendTransaction={(receiverId, amount) => sendTransaction(receiverId, amount, 0)}
-          onUpdateCoinFile={updateCoinFile}
-        />
+        <StudentInterface />
       );
     }
 
     if (viewPhase === 1) {
       return (
-        <Phase1UserInterface
-          room={room}
-          participant={currentParticipant ?? null}
-          onRequestTransaction={(receiverId, amount) => sendTransaction(receiverId, amount, 1)}
-        />
+        <Phase1UserInterface />
       );
     }
 
     if (viewPhase === 2) {
       return (
-        <Phase2UserInterface
-          room={room}
-          participant={currentParticipant!}
-          onProposeTransaction={async (senderId, receiverId, amount, proposedById) => {
-            await sendTransaction(receiverId, amount, 2, senderId, proposedById);
-          }}
-          onVote={voteOnTransaction}
-        />
+        <Phase2UserInterface />
       );
     }
 
@@ -266,21 +243,7 @@ export default function RoomPage() {
       return (
         <div className="space-y-6">
           <Phase3CryptoPanel defaultCollapsed={true} />
-          <Phase3UserInterface
-            room={room}
-            participant={currentParticipant!}
-            messages={messages}
-            onGenerateKeys={() => {
-              const result = generateKeys();
-              if (!result) throw new Error('Failed to generate keys');
-              return result;
-            }}
-            onBroadcastKey={broadcastPublicKey}
-            onSendMessage={async (content, messageHash, signature) => {
-              const result = await sendSignedMessage(content, messageHash, signature);
-              if (!result) throw new Error('Failed to send message');
-            }}
-          />
+          <Phase3UserInterface />
         </div>
       );
     }
@@ -289,113 +252,45 @@ export default function RoomPage() {
       return (
         <div className="space-y-6">
           <Phase4UtxoPanel
-            participant={currentParticipant!}
-            room={room}
-            utxos={utxos}
-            utxoTransactions={utxoTransactions}
             defaultCollapsed={true}
           />
-          <Phase4UserInterface
-            room={room}
-            participant={currentParticipant!}
-            utxos={utxos}
-            utxoTransactions={utxoTransactions}
-            onSendTransaction={sendUtxoTransaction}
-          />
+          <Phase4UserInterface />
         </div>
       );
     }
 
     if (viewPhase === 5) {
       return (
-        <Phase5UserInterface
-          room={room}
-          participant={currentParticipant!}
-          mempoolTransactions={mempoolTransactions}
-          nodeConnections={nodeConnections}
-          onCreateTransaction={(receiverId: string, amount: number) =>
-            createMempoolTransaction(receiverId, amount, 0)
-          }
-        />
+        <Phase5UserInterface />
       );
     }
 
     if (viewPhase === 6) {
       return (
-        <Phase6UserInterface
-          room={room}
-          participant={currentParticipant!}
-          blocks={blocks}
-          difficultyInfo={difficultyInfo}
-          onCreatePendingBlock={createPendingBlock}
-          onCalculateHash={calculateMiningHash}
-          onSubmitBlock={submitMinedBlock}
-        />
+        <Phase6UserInterface />
       );
     }
 
     if (viewPhase === 7) {
       return (
-        <Phase7UserInterface
-          room={room}
-          participant={currentParticipant!}
-          blocks={blocks}
-          difficultyInfo={difficultyInfo}
-          rigs={autoMining.rigs}
-          totalHashrate={autoMining.totalHashrate}
-          isAnyMining={autoMining.isAnyMining}
-          lastBlockEvent={autoMining.lastBlockEvent}
-          onToggleRig={autoMining.toggleRig}
-          onUpgradeRig={upgradeRig}
-          onCreateGenesisBlock={createGenesisBlock}
-          miningPools={miningPools}
-          poolsEnabled={poolsEnabled}
-          onCreatePool={createPool}
-          onJoinPool={joinPool}
-          onLeavePool={leavePool}
-        />
+        <Phase7UserInterface />
       );
     }
 
     if (viewPhase === 8) {
       return (
-        <Phase8UserInterface
-          room={room}
-          participant={currentParticipant!}
-          blocks={blocks}
-          mempoolTransactions={mempoolTransactions}
-          halvingInfo={halvingInfo}
-          autoMineSettings={autoMineSettings}
-          onCreateTransaction={createMempoolTransaction}
-          onAutoMineTick={autoMineTick}
-        />
+        <Phase8UserInterface />
       );
     }
 
     if (viewPhase === 9) {
       return (
-        <Phase9UserInterface
-          room={room}
-          participant={currentParticipant!}
-          blocks={blocks}
-          addresses={phase9Addresses}
-          utxos={phase9Utxos}
-          mempoolTxs={phase9MempoolTxs}
-          autoMineSettings={autoMineSettings}
-          onGenerateAddress={generateAddress}
-          onCreateTransaction={createPhase9Transaction}
-          onAutoMineTick={autoMineTickPhase9}
-        />
+        <Phase9UserInterface />
       );
     }
 
     return (
-      <StudentInterface
-        room={room}
-        participant={currentParticipant ?? null}
-        onSendTransaction={(receiverId, amount) => sendTransaction(receiverId, amount, currentPhase)}
-        onUpdateCoinFile={updateCoinFile}
-      />
+      <StudentInterface />
     );
   };
 
@@ -462,73 +357,7 @@ export default function RoomPage() {
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
         {isTeacher ? (
-          <TeacherDashboard
-            room={room}
-            messages={messages}
-            utxos={utxos}
-            utxoTransactions={utxoTransactions}
-            mempoolTransactions={mempoolTransactions}
-            nodeConnections={nodeConnections}
-            blocks={blocks}
-            difficultyInfo={difficultyInfo}
-            halvingInfo={halvingInfo}
-            economicStats={economicStats}
-            onHighlightTransaction={highlightTransaction}
-            onToggleBankDisconnection={toggleBankDisconnection}
-            onUpdateTransferLimit={updateTransferLimit}
-            onApproveTransaction={approveTransaction}
-            onRejectTransaction={rejectTransaction}
-            onForceTransaction={forceTransaction}
-            onVote={voteOnTransaction}
-            participant={currentParticipant}
-            onGenerateKeys={() => {
-              const result = generateKeys();
-              if (!result) throw new Error('Failed to generate keys');
-              return result;
-            }}
-            onBroadcastKey={broadcastPublicKey}
-            onSendSignedMessage={async (content, messageHash, signature) => {
-              const result = await sendSignedMessage(content, messageHash, signature);
-              if (!result) throw new Error('Failed to send message');
-            }}
-            onToggleNodeDisconnection={toggleNodeDisconnection}
-            onFillMempool={fillMempool}
-            onInitializeNetwork={initializeNetwork}
-            onCreateTeacherTransaction={createTeacherTransaction}
-            onDestroyConnection={destroyConnection}
-            onToggleStudentSending={toggleStudentSending}
-            onCreatePendingBlock={createPendingBlock}
-            onCreateGenesisBlock={createGenesisBlock}
-            onResetBlockchain={resetBlockchain}
-            onToggleMining={toggleMining}
-            onForceDifficultyAdjustment={forceDifficultyAdjustment}
-            onUpdateDifficultySettings={updateDifficultySettings}
-            onUpdateRigSettings={updateRigSettings}
-            miningPools={miningPools}
-            poolsEnabled={poolsEnabled}
-            onTogglePools={togglePools}
-            onDeletePool={deletePool}
-            onForceHalving={forceHalving}
-            onUpdateHalvingSettings={updateHalvingSettings}
-            autoMineSettings={autoMineSettings}
-            onUpdatePhase8Settings={updatePhase8Settings}
-            // Phase 9
-            simulationStats={simulationStats}
-            phase9Addresses={phase9Addresses}
-            phase9Utxos={phase9Utxos}
-            phase9MempoolTxs={phase9MempoolTxs}
-            onInitPhase9={initPhase9}
-            onResetPhase9={resetPhase9}
-            onUpdatePhase9Settings={updatePhase9Settings}
-            onFundAllPhase9Nodes={fundAllPhase9Nodes}
-            onGeneratePhase9Address={generateAddress}
-            onCreatePhase9Transaction={createPhase9Transaction}
-            onUpdateParticipantBalance={updateParticipantCoinFile}
-            onTeacherSendUtxo={teacherSendUtxo}
-            onProposeTransaction={async (senderId, receiverId, amount, proposedById) => {
-              await sendTransaction(receiverId, amount, 2, senderId, proposedById);
-            }}
-          />
+          <TeacherDashboard />
         ) : (
           renderStudentInterface()
         )}

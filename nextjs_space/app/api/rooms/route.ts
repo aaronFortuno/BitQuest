@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { generateRoomCode, createInitialCoinFile } from '@/lib/room-utils';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 // Create a new room (teacher)
@@ -36,7 +35,6 @@ export async function POST(req: NextRequest) {
       transactions: [],
     };
 
-    broadcastRoomUpdate(code);
     return NextResponse.json({ room, participantId: teacher.id });
   } catch (error) {
     console.error('Error creating room:', error);

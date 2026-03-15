@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { createInitialCoinFile } from '@/lib/room-utils';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 // Reset phase (delete all transactions, reset coin files)
@@ -60,8 +59,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       transactions: [],
     };
 
-    const roomCode = store.getRoomCodeById(id);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json({ room });
   } catch (error) {
     console.error('Error resetting phase:', error);

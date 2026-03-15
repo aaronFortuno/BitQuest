@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 // Track pending auto-reconnection timers per node
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -36,7 +35,6 @@ export async function PATCH(
     }
 
     const roomId = participant.roomId;
-    const roomCode = store.getRoomCodeById(roomId);
 
     // ── Node disconnection: deactivate connections + schedule auto-reconnect ──
     if (sanitizedUpdates.isNodeDisconnected === true) {
@@ -50,8 +48,7 @@ export async function PATCH(
         store.deactivateNodeConnection(conn.id, roomId);
       }
 
-      if (roomCode) broadcastRoomUpdate(roomCode);
-
+      
       // Schedule auto-reconnection after delay
       const timer = setTimeout(() => {
         reconnectTimers.delete(id);
@@ -71,8 +68,7 @@ export async function PATCH(
       autoReconnectNode(id, roomId);
     }
 
-    if (roomCode) broadcastRoomUpdate(roomCode);
-    return NextResponse.json(participant);
+        return NextResponse.json(participant);
   } catch (error) {
     console.error('Error updating participant:', error);
     return NextResponse.json(
@@ -109,9 +105,7 @@ function autoReconnectNode(nodeId: string, roomId: string) {
     });
   }
 
-  const roomCode = store.getRoomCodeById(roomId);
-  if (roomCode) broadcastRoomUpdate(roomCode);
-}
+  }
 
 // GET: Get a specific participant
 export async function GET(

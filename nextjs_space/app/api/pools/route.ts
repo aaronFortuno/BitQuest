@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 const POOL_COLORS = [
   '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
@@ -74,8 +73,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
-    const roomCode = store.getRoomCodeById(roomId);
-
     if (action === 'toggle-pools') {
       const { enabled } = body;
       store.updateRoom(roomId, { poolsEnabled: !!enabled });
@@ -85,7 +82,7 @@ export async function POST(request: NextRequest) {
         store.deleteAllMiningPools(roomId);
       }
 
-      if (roomCode) broadcastRoomUpdate(roomCode);
+
       return NextResponse.json({ success: true, poolsEnabled: !!enabled });
     }
 
@@ -120,7 +117,7 @@ export async function POST(request: NextRequest) {
         colorHex: availableColor,
       });
 
-      if (roomCode) broadcastRoomUpdate(roomCode);
+
       return NextResponse.json({ success: true, pool });
     }
 
@@ -144,7 +141,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Pool not found' }, { status: 404 });
       }
 
-      if (roomCode) broadcastRoomUpdate(roomCode);
+
       return NextResponse.json({ success: true, pool });
     }
 
@@ -160,7 +157,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Pool not found' }, { status: 404 });
       }
 
-      if (roomCode) broadcastRoomUpdate(roomCode);
+
       return NextResponse.json({ success: true });
     }
 
@@ -176,7 +173,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Pool not found' }, { status: 404 });
       }
 
-      if (roomCode) broadcastRoomUpdate(roomCode);
+
       return NextResponse.json({ success: true });
     }
 

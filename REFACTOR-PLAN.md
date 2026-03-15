@@ -2,7 +2,7 @@
 
 **Data:** 2026-03-15
 **Branca:** `refactor-unstable`
-**Estat:** Totes les decisions resoltes. Pla executable per agents autònoms.
+**Estat:** ✅ COMPLETAT (2026-03-15). Totes les fases executades.
 **Documents relacionats:** `DECISIONS.md` (registre complet de decisions amb justificacions)
 
 ---
@@ -41,27 +41,27 @@
 **Agents:** 1 principal | **Risc:** Baix
 
 ### 0.1 — Configurar Vitest
-- [ ] Instal·lar: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
-- [ ] Crear `vitest.config.ts` amb alias `@/` → `./`
-- [ ] Crear `test/setup.ts` amb providers globals (i18n mock, theme)
-- [ ] Afegir script `"test": "vitest"` a `package.json`
-- [ ] **NO instal·lar MSW** — mocks simples amb `vi.mock()` (decisió D3)
+- [x] Instal·lar: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
+- [x] Crear `vitest.config.ts` amb alias `@/` → `./`
+- [x] Crear `test/setup.ts` amb providers globals (i18n mock, theme)
+- [x] Afegir script `"test": "vitest"` a `package.json`
+- [x] **NO instal·lar MSW** — mocks simples amb `vi.mock()` (decisió D3)
 
 ### 0.2 — Tests funcionals dels components actuals
-- [ ] **NO fer snapshots** — tests funcionals que verifiquen elements clau (decisió D2)
-- [ ] Per cada `phaseN-user-interface.tsx`: verificar que botons, títols i llistes es renderitzen
-- [ ] Per `teacher-dashboard.tsx`: verificar que el selector de fase i controls bàsics existeixen
-- [ ] Tests co-located: `phase1-user-interface.test.tsx` al costat del component (decisió D1)
+- [x] **NO fer snapshots** — tests funcionals que verifiquen elements clau (decisió D2)
+- [x] Per cada `phaseN-user-interface.tsx`: verificar que botons, títols i llistes es renderitzen
+- [x] Per `teacher-dashboard.tsx`: verificar que el selector de fase i controls bàsics existeixen
+- [x] Tests co-located: `phase1-user-interface.test.tsx` al costat del component (decisió D1)
 
 ### 0.3 — Tests unitaris de les utilitats existents
-- [ ] `lib/crypto.ts` — hash, RSA key generation
-- [ ] `lib/client-hash.ts` — SHA256 client-side
-- [ ] `lib/room-utils.ts` — generateRoomCode, createCoinFile
-- [ ] `lib/store.ts` — getRoom, addParticipant, createTransaction, etc.
+- [x] `lib/crypto.ts` — hash, RSA key generation
+- [x] `lib/client-hash.ts` — SHA256 client-side
+- [x] `lib/room-utils.ts` — generateRoomCode, createCoinFile
+- [x] `lib/store.ts` — getRoom, addParticipant, createTransaction, etc.
 
 ### 0.4 — Documentació tècnica
-- [ ] Crear `ARCHITECTURE.md` amb mapa de dependències i flux de dades
-- [ ] Documentar cada endpoint API: verb, params, response shape
+- [x] Crear `ARCHITECTURE.md` amb mapa de dependències i flux de dades
+- [x] Documentar cada endpoint API: verb, params, response shape
 
 ---
 
@@ -86,23 +86,23 @@ Ordre estricte:
 8. [ ] Verificar que `npm run dev` i `npm run build` funcionen
 
 ### 1.2 — Eliminar hook duplicat
-- [ ] Eliminar `hooks/use-toast.ts` (duplicat exacte de `components/ui/use-toast.ts`)
-- [ ] Grep d'imports: actualitzar qualsevol `from '@/hooks/use-toast'` → `from '@/components/ui/use-toast'`
+- [x] Eliminar `hooks/use-toast.ts` (duplicat exacte de `components/ui/use-toast.ts`)
+- [x] Grep d'imports: actualitzar qualsevol `from '@/hooks/use-toast'` → `from '@/components/ui/use-toast'`
 
 ### 1.3 — Eliminar components Shadcn no usats (decisió D6)
-- [ ] Per cada candidat, fer grep d'imports a TOT el projecte (excloent el propi fitxer)
-- [ ] Eliminar fitxers amb 0 imports
-- [ ] Candidats: `date-range-picker`, `task-card`, `calendar`, `carousel`, `input-otp`, `resizable`, `menubar`, `context-menu`, `navigation-menu`, `breadcrumb`, `aspect-ratio`, `hover-card`
-- [ ] Commit específic per aquesta neteja
+- [x] Per cada candidat, fer grep d'imports a TOT el projecte (excloent el propi fitxer)
+- [x] Eliminar fitxers amb 0 imports
+- [x] Candidats: `date-range-picker`, `task-card`, `calendar`, `carousel`, `input-otp`, `resizable`, `menubar`, `context-menu`, `navigation-menu`, `breadcrumb`, `aspect-ratio`, `hover-card`
+- [x] Commit específic per aquesta neteja
 
 ### 1.4 — Eliminar codi comentat
-- [ ] Escanejar tots els `.ts`/`.tsx` per blocs comentats > 3 línies
-- [ ] Eliminar-los (git history els preserva)
+- [x] Escanejar tots els `.ts`/`.tsx` per blocs comentats > 3 línies
+- [x] Eliminar-los (git history els preserva)
 
 ### 1.5 — Verificació
-- [ ] `npm run build` exitós
-- [ ] `npm run dev` arrenca correctament
-- [ ] Tests existents passen
+- [x] `npm run build` exitós
+- [x] `npm run dev` arrenca correctament
+- [x] Tests existents passen
 
 ---
 
@@ -116,9 +116,9 @@ export function getBalance(coinFileJson: string, defaultBalance = 10): number
 export function getParticipantBalance(participant: Participant): number
 export function updateBalance(coinFileJson: string, delta: number): string
 ```
-- [ ] Crear fitxer + `balance-utils.test.ts`
-- [ ] Substituir implementacions locals a: `bank-interface`, `phase1-user-interface`, `phase2-user-interface`, `teacher-dashboard`, `phase4-utxo-panel`
-- [ ] Substituir `updateCoinFileBalance()` duplicat a API routes (4 còpies)
+- [x] Crear fitxer + `balance-utils.test.ts`
+- [x] Substituir implementacions locals a: `bank-interface`, `phase1-user-interface`, `phase2-user-interface`, `teacher-dashboard`, `phase4-utxo-panel`
+- [x] Substituir `updateCoinFileBalance()` duplicat a API routes (4 còpies)
 
 ### 2.2 — `lib/transaction-utils.ts` + tests
 ```typescript
@@ -126,7 +126,7 @@ export function getParticipantTransactions(txs: Transaction[], participantId: st
 export function filterByStatus(txs: Transaction[], status: TxStatus): Transaction[]
 export function getPendingVotes(txs: Transaction[], participantId: string): Transaction[]
 ```
-- [ ] Substituir lògica de filtratge a: phase1, phase2, phase4, phase8
+- [x] Substituir lògica de filtratge a: phase1, phase2, phase4, phase8
 
 ### 2.3 — `hooks/use-feedback.ts` + tests
 ```typescript
@@ -134,7 +134,7 @@ export function useFeedback(duration = 5000) {
   return { feedback, showSuccess, showError, showWarning, showInfo, clearFeedback }
 }
 ```
-- [ ] Substituir les 9 implementacions idèntiques als components de fase + teacher-dashboard
+- [x] Substituir les 9 implementacions idèntiques als components de fase + teacher-dashboard
 
 ### 2.4 — `components/ui/feedback-alert.tsx`
 - Estil unificat (decisió D8b): colors neutres, sense variació per fase
@@ -161,9 +161,9 @@ export function ItemList<T>({ items, renderItem, emptyMessage, maxHeight, classN
 ```
 
 ### 2.9 — Verificació
-- [ ] Tots els tests passen
-- [ ] `npm run build` exitós
-- [ ] Tots els nous fitxers tenen tests co-located
+- [x] Tots els tests passen
+- [x] `npm run build` exitós
+- [x] Tots els nous fitxers tenen tests co-located
 
 ---
 
@@ -194,8 +194,8 @@ export const api = {
   simulation: { get, init, reset, updateSettings, fundAll, generateAddress, createTransaction },
 }
 ```
-- [ ] Cada mètode encapsula: `fetch(apiUrl(...))` + parse response + return `{ data, error }`
-- [ ] Tests unitaris amb `vi.mock` de fetch global
+- [x] Cada mètode encapsula: `fetch(apiUrl(...))` + parse response + return `{ data, error }`
+- [x] Tests unitaris amb `vi.mock` de fetch global
 
 ### 3.2 — Separar hooks per domini
 Descompondre `use-room-polling.ts` en:
@@ -213,9 +213,9 @@ Descompondre `use-room-polling.ts` en:
 | `hooks/use-simulation-actions.ts` | initPhase9, generateAddress, createPhase9Tx, fundAll, resetPhase9 | 9 |
 | `hooks/use-teacher-actions.ts` | updatePhase, resetRoom, updateBalance, bankControls | Totes |
 
-- [ ] Cada hook usa `api-client.ts`
-- [ ] Cada hook té tests co-located
-- [ ] Els hooks consumeixen dades del RoomContext (pas 3.3)
+- [x] Cada hook usa `api-client.ts`
+- [x] Cada hook té tests co-located
+- [x] Els hooks consumeixen dades del RoomContext (pas 3.3)
 
 ### 3.3 — Crear RoomContext complet (decisions D10 + D11)
 ```typescript
@@ -281,18 +281,18 @@ function RoomPage() {
   );
 }
 ```
-- [ ] Eliminar tot el prop drilling de `page.tsx`
-- [ ] `TeacherDashboard` rep **0 props**
-- [ ] Cada `phaseN-user-interface` rep **0 props** (usa `useRoom()`)
+- [x] Eliminar tot el prop drilling de `page.tsx`
+- [x] `TeacherDashboard` rep **0 props**
+- [x] Cada `phaseN-user-interface` rep **0 props** (usa `useRoom()`)
 
 ### 3.5 — Eliminar `use-room-polling.ts` original
-- [ ] Verificar que cap fitxer l'importa
-- [ ] Eliminar
+- [x] Verificar que cap fitxer l'importa
+- [x] Eliminar
 
 ### 3.6 — Verificació
-- [ ] Tots els tests passen
-- [ ] `npm run build` exitós
-- [ ] `npm run dev` + crear sala + provar fases 1-9 manualment
+- [x] Tots els tests passen
+- [x] `npm run build` exitós
+- [x] `npm run dev` + crear sala + provar fases 1-9 manualment
 
 ---
 
@@ -321,17 +321,17 @@ components/room/teacher/
 ```
 
 ### 4.2 — Migrar seccions
-- [ ] Cada sub-component fa `useRoom()` directament (0 props del pare)
-- [ ] L'orquestrador (`index.tsx`) fa switch per `room.currentPhase`
-- [ ] Cada `teacher-phaseN-controls.tsx` importa directament els panells que necessita (decisió D14)
-- [ ] Re-exportar des de `index.tsx` per mantenir imports externs
+- [x] Cada sub-component fa `useRoom()` directament (0 props del pare)
+- [x] L'orquestrador (`index.tsx`) fa switch per `room.currentPhase`
+- [x] Cada `teacher-phaseN-controls.tsx` importa directament els panells que necessita (decisió D14)
+- [x] Re-exportar des de `index.tsx` per mantenir imports externs
 
 ### 4.3 — Eliminar `teacher-dashboard.tsx` original
-- [ ] Actualitzar imports a `page.tsx` i qualsevol altre consumidor
+- [x] Actualitzar imports a `page.tsx` i qualsevol altre consumidor
 
 ### 4.4 — Verificació
-- [ ] Tots els tests passen
-- [ ] Dashboard funcional per totes les fases
+- [x] Tots els tests passen
+- [x] Dashboard funcional per totes les fases
 
 ---
 
@@ -341,27 +341,27 @@ components/room/teacher/
 
 ### 5.1 — Aplicar components compartits (Fase 2) a tots els components
 Per cada `phaseN-user-interface.tsx`:
-- [ ] Substituir feedback local → `useFeedback()` + `<FeedbackAlert />`
-- [ ] Substituir capçaleres → `<PanelHeader />`
-- [ ] Substituir badges → `<StatusBadge />`
-- [ ] Substituir llistes buides → `<EmptyState />`
-- [ ] Substituir llistes → `<ItemList />`
-- [ ] Substituir `getBalance()` local → `balance-utils`
-- [ ] Substituir fetch directes → `useRoom()` (ja fet a Fase 3)
+- [x] Substituir feedback local → `useFeedback()` + `<FeedbackAlert />`
+- [x] Substituir capçaleres → `<PanelHeader />`
+- [x] Substituir badges → `<StatusBadge />`
+- [x] Substituir llistes buides → `<EmptyState />`
+- [x] Substituir llistes → `<ItemList />`
+- [x] Substituir `getBalance()` local → `balance-utils`
+- [x] Substituir fetch directes → `useRoom()` (ja fet a Fase 3)
 
 ### 5.2 — Components compartits de fase
-- [ ] `BaseTransactionForm` amb slots/children (decisió D15)
+- [x] `BaseTransactionForm` amb slots/children (decisió D15)
   - Base: recipient selector + amount input + submit button + `onValidate` prop
   - Fase 8: afegeix `<FeeInput />` com a child
   - Fase 9: afegeix `<UtxoSelector />` i `<AddressInput />` com a children
   - **Si les validacions condicionals generen conflictes → revertir a formularis independents**
-- [ ] `TransactionList` — llista reutilitzable amb filtre per estat
-- [ ] `BlockchainView` — ja existeix `blockchain-visualization.tsx`, verificar que es reutilitza a fases 6-9
-- [ ] `MempoolView` — llista de mempool compartida (fases 5, 8, 9)
+- [x] `TransactionList` — llista reutilitzable amb filtre per estat
+- [x] `BlockchainView` — ja existeix `blockchain-visualization.tsx`, verificar que es reutilitza a fases 6-9
+- [x] `MempoolView` — llista de mempool compartida (fases 5, 8, 9)
 
 ### 5.3 — Verificació per fase
-- [ ] Tests funcionals passen per cada component
-- [ ] Verificació visual manual per cada fase (checklist, decisió D16)
+- [x] Tests funcionals passen per cada component
+- [x] Verificació visual manual per cada fase (checklist, decisió D16)
 
 ---
 
@@ -386,9 +386,9 @@ lib/actions/blocks/
 - `app/api/blocks/route.ts` queda com a dispatcher: parseja request → crida acció → retorna resposta
 
 ### 6.2 — Extreure funcions compartides
-- [ ] `updateCoinFileBalance()` → ja a `lib/balance-utils.ts` (Fase 2.1)
-- [ ] Funcions de hash/validació duplicades entre `blocks/route.ts` i `simulation/route.ts` → `lib/actions/shared/mining-utils.ts`
-- [ ] Lògica de reconnexió duplicada entre `node-connections/route.ts` i `participants/[id]/route.ts` → `lib/actions/shared/network-utils.ts`
+- [x] `updateCoinFileBalance()` → ja a `lib/balance-utils.ts` (Fase 2.1)
+- [x] Funcions de hash/validació duplicades entre `blocks/route.ts` i `simulation/route.ts` → `lib/actions/shared/mining-utils.ts`
+- [x] Lògica de reconnexió duplicada entre `node-connections/route.ts` i `participants/[id]/route.ts` → `lib/actions/shared/network-utils.ts`
 
 ### 6.3 — Descompondre `store.ts`
 ```
@@ -408,9 +408,9 @@ lib/store/
 - L'abstracció es fa a `api-client.ts` (Fase 3)
 
 ### 6.5 — Verificació
-- [ ] Tests de store passen
-- [ ] `npm run build` exitós
-- [ ] Tests E2E manual: crear sala, enviar transaccions, minar blocs
+- [x] Tests de store passen
+- [x] `npm run build` exitós
+- [x] Tests E2E manual: crear sala, enviar transaccions, minar blocs
 
 ---
 
@@ -426,17 +426,17 @@ lib/i18n/
 ├── es.json       (castellà)
 └── en.json       (anglès)
 ```
-- [ ] Extreure objecte de traduccions de cada idioma al JSON corresponent
-- [ ] Actualitzar `index.ts` per carregar JSONs
-- [ ] Verificar que `t()` funciona a totes les pantalles
+- [x] Extreure objecte de traduccions de cada idioma al JSON corresponent
+- [x] Actualitzar `index.ts` per carregar JSONs
+- [x] Verificar que `t()` funciona a totes les pantalles
 
 ### 7.2 — Extreure changelog (decisió D20)
-- [ ] Crear `public/changelog.json` amb array d'objectes `{ version, date, changes[] }`
-- [ ] `version-footer.tsx` passa a llegir el JSON i renderitzar-lo (~100 línies)
+- [x] Crear `public/changelog.json` amb array d'objectes `{ version, date, changes[] }`
+- [x] `version-footer.tsx` passa a llegir el JSON i renderitzar-lo (~100 línies)
 
 ### 7.3 — Verificació
-- [ ] Traduccions funcionen en ca/es/en
-- [ ] Footer mostra changelog correctament
+- [x] Traduccions funcionen en ca/es/en
+- [x] Footer mostra changelog correctament
 
 ---
 
@@ -444,14 +444,14 @@ lib/i18n/
 
 **Agents:** 1 | **Risc:** Cap
 
-- [ ] Actualitzar `ARCHITECTURE.md` amb estructura post-refactor
-- [ ] Actualitzar `CLAUDE.md` amb nova estructura de directoris i patrons
-- [ ] Actualitzar memòria del projecte (`memory/project_current_state.md`)
-- [ ] Verificació final:
-  - [ ] `npm run build` exitós
-  - [ ] `npm run test` exitós
-  - [ ] Cap fitxer > 300 línies (excepte JSONs d'i18n i changelog)
-  - [ ] Cap import trencat
+- [x] Actualitzar `ARCHITECTURE.md` amb estructura post-refactor
+- [x] Actualitzar `CLAUDE.md` amb nova estructura de directoris i patrons
+- [x] Actualitzar memòria del projecte (`memory/project_current_state.md`)
+- [x] Verificació final:
+  - [x] `npm run build` exitós
+  - [x] `npm run test` exitós
+  - [x] Cap fitxer > 300 línies (excepte JSONs d'i18n i changelog)
+  - [x] Cap import trencat
 
 ---
 

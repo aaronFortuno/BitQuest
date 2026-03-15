@@ -14,19 +14,11 @@ import {
   XCircle,
   AlertTriangle,
 } from 'lucide-react';
-import { Room, Participant, Transaction, CoinFile } from '@/lib/types';
+import { CoinFile } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
-interface Phase1UserInterfaceProps {
-  room: Room;
-  participant: Participant | null;
-  onRequestTransaction: (receiverId: string, amount: number) => Promise<Transaction | null>;
-}
-
-export default function Phase1UserInterface({
-  room,
-  participant,
-  onRequestTransaction,
-}: Phase1UserInterfaceProps) {
+export default function Phase1UserInterface() {
+  const { room, participant, sendTransaction } = useRoom();
   const { t } = useTranslation();
   const maxTransferAmount = room?.maxTransferAmount ?? 5;
   const [selectedReceiver, setSelectedReceiver] = useState('');
@@ -84,7 +76,7 @@ export default function Phase1UserInterface({
     }
 
     setSending(true);
-    const tx = await onRequestTransaction(selectedReceiver, parseInt(amount));
+    const tx = await sendTransaction(selectedReceiver, parseInt(amount), 1);
     setSending(false);
 
     if (tx) {

@@ -8,29 +8,19 @@ import {
   CheckCircle, XCircle, Loader2, Activity,
   Flame, ArrowDown,
 } from 'lucide-react';
-import { Room, Participant, Block, MempoolTransaction, HalvingInfo } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 
-interface Phase8UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  blocks: Block[];
-  mempoolTransactions: MempoolTransaction[];
-  halvingInfo?: HalvingInfo | null;
-  autoMineSettings: { autoMineInterval: number; autoMineCapacity: number };
-  onCreateTransaction: (receiverId: string, amount: number, fee: number) => Promise<{ success: boolean; error?: string }>;
-  onAutoMineTick: () => Promise<{ success: boolean; includedTxCount?: number; totalFees?: number; halvingEvent?: { previousReward: number; newReward: number }; error?: string }>;
-}
-
-export function Phase8UserInterface({
-  room,
-  participant,
-  blocks,
-  mempoolTransactions,
-  halvingInfo,
-  autoMineSettings,
-  onCreateTransaction,
-  onAutoMineTick,
-}: Phase8UserInterfaceProps) {
+export function Phase8UserInterface() {
+  const {
+    room,
+    participant,
+    blocks,
+    mempoolTransactions,
+    halvingInfo,
+    autoMineSettings,
+    createMempoolTransaction: onCreateTransaction,
+    autoMineTick: onAutoMineTick,
+  } = useRoom();
   const { t } = useTranslation();
 
   // Transaction creation state
@@ -60,12 +50,12 @@ export function Phase8UserInterface({
   const capacity = autoMineSettings.autoMineCapacity;
 
   // Other students for recipient
-  const otherStudents = room.participants.filter(
-    p => p.isActive && p.role === 'student' && p.id !== participant.id
+  const otherStudents = (room?.participants ?? []).filter(
+    p => p.isActive && p.role === 'student' && p.id !== participant?.id
   );
 
   // My pending transactions
-  const myPendingTxs = pendingMempoolTxs.filter(tx => tx.senderId === participant.id);
+  const myPendingTxs = pendingMempoolTxs.filter(tx => tx.senderId === participant?.id);
 
   // Median fee for guidance
   const medianFee = pendingMempoolTxs.length > 0
@@ -158,6 +148,8 @@ export function Phase8UserInterface({
 
   // Last 10 blocks for display (newest last, growing right)
   const displayBlocks = minedBlocks.slice(-10);
+
+  if (!room || !participant) return null;
 
   return (
     <div className="space-y-4">

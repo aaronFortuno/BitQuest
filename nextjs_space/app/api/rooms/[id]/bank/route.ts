@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 // Change the bank (assign bank role to a different participant)
@@ -31,8 +30,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       newBank.isBank = true;
     }
 
-    const roomCode = store.getRoomCodeById(roomId);
-    if (roomCode) broadcastRoomUpdate(roomCode);
     return NextResponse.json({ bank: newBank });
   } catch (error) {
     console.error('Error changing bank:', error);
@@ -52,8 +49,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const room = store.updateRoom(roomId, updateData);
 
-    const roomCode2 = store.getRoomCodeById(roomId);
-    if (roomCode2) broadcastRoomUpdate(roomCode2);
     return NextResponse.json({ room });
   } catch (error) {
     console.error('Error toggling bank connection:', error);

@@ -9,47 +9,27 @@ import {
   ArrowRight, Zap, Info, Settings, TrendingUp, TrendingDown, Minus,
   Link, Coins, Clock,
 } from 'lucide-react';
-import { Room, Participant, Block, BlockTransaction } from '@/lib/types';
-import { DifficultyInfo } from '@/hooks/use-room-polling';
+import { Participant, Block, BlockTransaction } from '@/lib/types';
+import { useRoom } from '@/contexts/room-context';
 import { BlockchainVisualization } from './blockchain-visualization';
 import Phase6BlockchainPanel from './phase6-blockchain-panel';
 
-interface Phase6UserInterfaceProps {
-  room: Room;
-  participant: Participant;
-  blocks: Block[];
-  difficultyInfo?: DifficultyInfo | null;
-  onCreatePendingBlock: () => Promise<Block | null>;
-  onCalculateHash: (nonce: number) => Promise<{
-    hash: string;
-    hashShort: string;
-    isValid: boolean;
-    difficulty: number;
-    blockNumber: number;
-  } | null>;
-  onSubmitBlock: (nonce: number, hash: string) => Promise<{
-    success: boolean;
-    error?: string;
-    code?: string;
-    block?: Block;
-    reward?: number;
-    difficultyAdjustment?: {
-      previousDifficulty: number;
-      newDifficulty: number;
-      result: 'increased' | 'decreased' | 'stable';
-    };
-  }>;
-}
+export function Phase6UserInterface() {
+  const {
+    room,
+    participant,
+    blocks,
+    difficultyInfo,
+    createPendingBlock,
+    calculateMiningHash,
+    submitMinedBlock,
+  } = useRoom();
 
-export function Phase6UserInterface({
-  room,
-  participant,
-  blocks,
-  difficultyInfo,
-  onCreatePendingBlock,
-  onCalculateHash,
-  onSubmitBlock
-}: Phase6UserInterfaceProps) {
+  if (!room || !participant) return null;
+
+  const onCreatePendingBlock = createPendingBlock;
+  const onCalculateHash = calculateMiningHash;
+  const onSubmitBlock = submitMinedBlock;
   const { t } = useTranslation();
   const [currentNonce, setCurrentNonce] = useState(Math.floor(Math.random() * 10000));
   const [lastHash, setLastHash] = useState<string | null>(null);

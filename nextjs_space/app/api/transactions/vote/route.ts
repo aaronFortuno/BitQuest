@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
-
-
-// Helper function to update coinFile balance
-function updateCoinFileBalance(coinFile: string, delta: number): string {
-  try {
-    const parsed = JSON.parse(coinFile);
-    parsed.saldo = (parsed.saldo || 0) + delta;
-    return JSON.stringify(parsed);
-  } catch {
-    return JSON.stringify({ propietari: '', saldo: delta });
-  }
-}
+import { updateBalance } from '@/lib/balance-utils';
 
 // POST /api/transactions/vote - Vote on a transaction
 export async function POST(request: NextRequest) {
@@ -78,15 +66,13 @@ export async function POST(request: NextRequest) {
 
       if (sender && receiver) {
         store.updateParticipant(transaction.senderId, {
-          coinFile: updateCoinFileBalance(sender.coinFile, -transaction.amount),
+          coinFile: updateBalance(sender.coinFile, -transaction.amount),
         });
         store.updateParticipant(transaction.receiverId, {
-          coinFile: updateCoinFileBalance(receiver.coinFile, transaction.amount),
+          coinFile: updateBalance(receiver.coinFile, transaction.amount),
         });
       }
 
-      const roomCode = store.getRoomCodeById(transaction.roomId);
-      if (roomCode) broadcastRoomUpdate(roomCode);
       return NextResponse.json({
         status: 'approved',
         message: 'Transaction approved by consensus',
@@ -113,16 +99,12 @@ export async function POST(request: NextRequest) {
         rejectReason,
       });
 
-      const roomCode2 = store.getRoomCodeById(transaction.roomId);
-      if (roomCode2) broadcastRoomUpdate(roomCode2);
       return NextResponse.json({
         status: 'rejected',
         message: 'Transaction rejected by consensus',
       });
     }
 
-    const roomCode3 = store.getRoomCodeById(transaction.roomId);
-    if (roomCode3) broadcastRoomUpdate(roomCode3);
     return NextResponse.json({
       status: 'voting',
       votesFor: updatedTransaction.votesFor,

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 // POST: Register a public key for a participant (generated client-side)
 export async function POST(request: NextRequest) {
@@ -21,13 +20,6 @@ export async function POST(request: NextRequest) {
 
     const alreadyExisted = !!participant.publicKey;
     store.updateParticipant(participantId, { publicKey });
-
-    // Broadcast so all clients see the new key in the registry
-    const roomCode = store.getRoomCodeById(participant.roomId);
-    if (roomCode) {
-      console.log('[POST /api/keys] Broadcasting to room:', roomCode);
-      broadcastRoomUpdate(roomCode);
-    }
 
     console.log('[POST /api/keys] Success');
     return NextResponse.json({ publicKey, alreadyExisted });

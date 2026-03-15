@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { store } from '@/lib/store';
 import { createInitialCoinFile } from '@/lib/room-utils';
-import { broadcastRoomUpdate } from '@/lib/io';
 
 
 export async function POST(req: NextRequest) {
@@ -78,7 +77,6 @@ export async function POST(req: NextRequest) {
       transactions,
     };
 
-    broadcastRoomUpdate(formattedCode);
     return NextResponse.json({ room: updatedRoom, participantId: participant.id });
   } catch (error) {
     console.error('Error joining room:', error);

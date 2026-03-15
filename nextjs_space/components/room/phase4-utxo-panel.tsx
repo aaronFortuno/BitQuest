@@ -8,15 +8,11 @@ import {
   Shield, Lock, CheckCircle, XCircle, AlertTriangle,
   Fingerprint, RefreshCw, Ban, Radio, Users,
 } from 'lucide-react';
-import { Participant, Room, UTXO, UTXOTransaction } from '@/lib/types';
 import { miniHash, modPow, parsePublicKey, type RSAKeyPair } from '@/lib/crypto';
 import { StepCard, AccordionBlock } from '@/components/ui/educational-blocks';
+import { useRoom } from '@/contexts/room-context';
 
 interface Phase4UtxoPanelProps {
-  participant: Participant;
-  room: Room;
-  utxos: UTXO[];
-  utxoTransactions: UTXOTransaction[];
   defaultCollapsed?: boolean;
 }
 
@@ -25,12 +21,16 @@ function hex(n: number): string {
 }
 
 export default function Phase4UtxoPanel({
-  participant,
-  room,
-  utxos,
-  utxoTransactions,
   defaultCollapsed = false,
 }: Phase4UtxoPanelProps) {
+  const {
+    room,
+    participant,
+    utxos,
+    utxoTransactions,
+  } = useRoom();
+
+  if (!room || !participant) return null;
   const { t } = useTranslation();
   const [panelCollapsed, setPanelCollapsed] = useState(defaultCollapsed);
   const [expandedBlocks, setExpandedBlocks] = useState<Set<number>>(new Set([1]));
@@ -261,7 +261,7 @@ export default function Phase4UtxoPanel({
         </AccordionBlock>
 
         {/* Arrow */}
-        <div className={`flex justify-center transition-opacity duration-300 ${hasKeys ? 'opacity-100' : 'opacity-20'}`}>
+        <div className="flex justify-center">
           <span className="text-2xl text-amber-400">↓</span>
         </div>
 
@@ -271,7 +271,6 @@ export default function Phase4UtxoPanel({
           label={t('phase4Panel.block3Title')}
           expanded={expandedBlocks.has(3)}
           onToggle={() => toggleBlock(3)}
-          disabled={!hasKeys}
         >
           <div className="p-4 space-y-4">
             {!hasKeys ? (
